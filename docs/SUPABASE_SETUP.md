@@ -26,11 +26,12 @@
 
 | 항목 | 값 |
 |------|-----|
-| Site URL | `https://YOUR-VERCEL-URL.vercel.app` (배포 후 실제 URL) |
-| Redirect URLs | 배포 URL, `http://localhost:5173` |
+| Site URL | `https://futureme-beta.vercel.app` |
+| Redirect URLs | 아래 3개 모두 추가 |
 
-예 (Vercel 기본 도메인):
+예 (현재 Future Me 프로덕션):
 - `https://futureme-beta.vercel.app`
+- `https://futureme-beta-jongyoon2580-9297s-projects.vercel.app`
 - `http://localhost:5173`
 
 ## 4. 환경 변수

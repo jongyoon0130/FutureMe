@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TalkBack Logo v5 — 10 refinements</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0e0e0e;
+      color: #e8e8e8;
+      padding: 32px 24px 48px;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 6px; }
+    p { color: #888; font-size: 0.85rem; margin: 0 0 28px; max-width: 640px; line-height: 1.5; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+      max-width: 1100px;
+    }
+    .card {
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 20px 16px 14px;
+      text-align: center;
+    }
+    .card svg { display: block; margin: 0 auto 12px; width: 96px; height: 96px; }
+    .card .label { font-size: 0.8rem; font-weight: 600; color: #6AEBA8; }
+    .card .desc { font-size: 0.7rem; color: #666; margin-top: 4px; line-height: 1.35; }
+    .swatch {
+      display: flex; gap: 12px; margin-bottom: 24px; font-size: 0.75rem; color: #666;
+    }
+    .swatch span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 14px; height: 14px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>TalkBack Logo v5</h1>
+  <p>전원(0+1) + 역재생(◀) “돌아온다” — 가운데 공허·비율 다듬은 10안. mint <code>#6AEBA8</code> · bg <code>#141414</code></p>
+  <div class="swatch">
+    <span><i class="dot" style="background:#6AEBA8"></i>#6AEBA8</span>
+    <span><i class="dot" style="background:#141414;border:1px solid #333"></i>#141414</span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <script>
+    const M = '#6AEBA8';
+    const variants = [
+      {
+        id: 'v5-01',
+        name: '01 · 균형 갭',
+        desc: '링 두께↑, ◀가 갭에 딱 맞게. 공허↓',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 38 10 A 22 22 0 1 1 38 54" stroke="${M}" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <path d="M 14 32 L 28 22 L 28 42 Z" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-02',
+        name: '02 · 두꺼운 링',
+        desc: 'stroke 6, 반지름 살짝↓ — 덩어리감',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 37 11 A 21 21 0 1 1 37 53" stroke="${M}" stroke-width="6" stroke-linecap="round" fill="none"/>
+          <path d="M 12 32 L 26 24 L 26 40 Z" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-03',
+        name: '03 · 이어진 전원',
+        desc: '◀ 밑변=링 끝과 연결 (0|1 일체)',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 36 12 A 20 20 0 1 1 36 52" stroke="${M}" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <path d="M 16 24 L 16 40 L 30 32 Z" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-04',
+        name: '04 · 중심 점',
+        desc: '전원 “1” 힌트 — 작은 코어 점',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 38 10 A 22 22 0 1 1 38 54" stroke="${M}" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M 13 32 L 27 23 L 27 41 Z" fill="${M}"/>
+          <circle cx="36" cy="32" r="3.5" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-05',
+        name: '05 · 대각 분할',
+        desc: 'v3-08 계열 — 반원+◀, 중앙 밀도↑',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 32 10 A 22 22 0 0 1 32 54 A 22 22 0 0 1 32 10" stroke="${M}" stroke-width="5" fill="none" stroke-dasharray="69 69" stroke-dashoffset="17"/>
+          <line x1="32" y1="14" x2="32" y2="50" stroke="${M}" stroke-width="2.5" stroke-linecap="round" opacity="0.45"/>
+          <path d="M 11 32 L 24 24 L 24 40 Z" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-06',
+        name: '06 · C자 아크',
+        desc: '270° 아크 + ◀가 빈 공간 메움',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 44 14 A 20 20 0 1 0 44 50" stroke="${M}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+          <path d="M 10 32 L 26 20 L 26 44 Z" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-07',
+        name: '07 · 이중 아크',
+        desc: '안쪽 얇은 호 — 중앙 허전함 완화',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 38 10 A 22 22 0 1 1 38 54" stroke="${M}" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <path d="M 42 18 A 14 14 0 1 1 42 46" stroke="${M}" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.55"/>
+          <path d="M 13 32 L 27 23 L 27 41 Z" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-08',
+        name: '08 · 더블 ◀',
+        desc: '되돌아옴 ×2 — 작은 chevron',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 38 10 A 22 22 0 1 1 38 54" stroke="${M}" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M 18 32 L 28 25 L 28 39 Z" fill="${M}"/>
+          <path d="M 10 32 L 18 27 L 18 37 Z" fill="${M}" opacity="0.5"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-09',
+        name: '09 · 컴팩트',
+        desc: '아이콘 88% 채움 — 여백 최소',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <path d="M 40 8 A 24 24 0 1 1 40 56" stroke="${M}" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+          <path d="M 8 32 L 24 20 L 24 44 Z" fill="${M}"/>
+        </svg>`,
+      },
+      {
+        id: 'v5-10',
+        name: '10 · 클래식 전원 90°',
+        desc: '표준 ⏻ 옆으로 — 1=가로 ◀',
+        svg: `<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="14" fill="#141414"/>
+          <circle cx="38" cy="32" r="20" stroke="${M}" stroke-width="5" fill="none"/>
+          <rect x="8" y="29" width="22" height="6" rx="3" fill="${M}"/>
+          <path d="M 8 32 L 17 27 L 17 37 Z" fill="${M}"/>
+        </svg>`,
+      },
+    ];
+
+    const grid = document.getElementById('grid');
+    variants.forEach((v) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = v.svg + `<div class="label">${v.name}</div><div class="desc">${v.desc}</div>`;
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>

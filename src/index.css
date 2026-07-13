@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard", "Pretendard Variable", system-ui, -apple-system, sans-serif;
+  --font-serif: "Noto Serif KR", "Nanum Myeongjo", serif;
+
+  /*
+   * 메신저처럼 “방 색 / 내 말 / 상대 말”이 hue로 구분되게
+   * (카톡 하늘+노랑 복제 X — 톡백: 로즈 방 + 피치 말풍선)
+   */
+  --color-void: #f0dde6;        /* 채팅방 — 부드러운 로즈·라일락 */
+  --color-surface: #fff9f6;     /* 헤더·바 */
+  --color-surface-2: #f5ddd0;   /* 입력창 등 */
+  --color-border: #e4b8a8;
+  --color-ink: #3a2f2c;
+  --color-muted: #9a7368;
+  --color-accent: #d9785c;
+  --color-accent-dim: #c4654a;
+  --color-glow: #f0a882;
+  --color-glow-dim: #e08a62;
+  --color-bubble-me: #f0a078;   /* 내 말 — 따뜻한 피치·살구 */
+  --color-bubble-them: #fffcf9; /* 또-나 — 따뜻한 화이트 */
+  --color-avatar: #e8927a;
+  --color-avatar-ink: #ffffff;
+  --color-status-ok: #16a34a;
+  --color-status-warn: #d97706;
+  --color-status-error: #dc2626;
+  --color-scrollbar: #ddb8c8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-void);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.02em;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+  letter-spacing: 0.01em;
+}
+
+.chat-bubble-me {
+  background: var(--color-bubble-me);
+  color: var(--color-ink);
+  border-radius: 20px 20px 6px 20px;
+}
+
+.chat-bubble-them {
+  background: var(--color-bubble-them);
+  color: var(--color-ink);
+  border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  border-radius: 20px 20px 20px 6px;
+}
+
+.chat-bubble-them-group-first {
+  border-radius: 20px 20px 18px 18px;
+}
+
+.chat-bubble-them-group-mid {
+  border-radius: 18px;
+}
+
+.chat-bubble-them-group-last {
+  border-radius: 18px 18px 20px 6px;
+}
+
+.chat-bubble-me-group-first {
+  border-radius: 20px 20px 18px 20px;
+}
+
+.chat-bubble-me-group-mid {
+  border-radius: 18px 20px 20px 18px;
+}
+
+.chat-bubble-me-group-last {
+  border-radius: 18px 6px 20px 20px;
+}
+
+.chat-avatar {
+  background: var(--color-avatar);
+  color: var(--color-avatar-ink);
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.35; }
+  30% { opacity: 0.9; }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.typing-dot {
+  animation: typing 1.4s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-scrollbar); border-radius: 3px; }

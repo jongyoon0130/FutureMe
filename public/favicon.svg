@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" role="img" aria-label="톡백">
+  <rect width="32" height="32" rx="7" fill="#141414"/>
+  <rect x="7" y="8" width="2.75" height="16" rx="1.4" fill="#C8FF00"/>
+  <rect x="11.75" y="8" width="2.75" height="16" rx="1.4" fill="#C8FF00" opacity="0.92"/>
+  <path d="M 16.5 16 L 25 8.5 L 25 23.5 Z" fill="#C8FF00"/>
+</svg>

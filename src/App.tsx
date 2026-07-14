@@ -12,9 +12,11 @@ import {
   loadProfileSummaries,
   loadProfileById,
   saveProfileRecord,
+  deleteProfileRecord,
   reconcileProfileSummariesFromChats,
   clearOnboardingProgress,
   loadOnboardingProgress,
+  ONBOARDING_PROGRESS_VERSION,
   parseBackup,
   applyBackup,
   saveChatAsync,
@@ -85,6 +87,16 @@ export default function App() {
     })
   }
 
+  const handleDeleteProfile = async (id: string) => {
+    await deleteProfileRecord(id)
+    if (activeProfileId === id) {
+      setActiveProfileId(null)
+      setProfile(null)
+      setScreen('list')
+    }
+    refreshList()
+  }
+
   const handleProfileDeleted = () => {
     refreshList()
     setActiveProfileId(null)
@@ -150,8 +162,8 @@ export default function App() {
             summaries={summaries}
             onSelect={openProfile}
             onCreateNew={() => {
-              const saved = loadOnboardingProgress<{ stepIdx?: number }>()
-              if (saved?.stepIdx && saved.stepIdx > 0) {
+              const saved = loadOnboardingProgress<{ version?: number; stepIdx?: number }>()
+              if (saved?.version === ONBOARDING_PROGRESS_VERSION && saved.stepIdx && saved.stepIdx > 0) {
                 const resume = window.confirm(
                   '진행 중인 만들기가 저장돼 있어요.\n\n확인 → 이어서 만들기\n취소 → 처음부터 새로 만들기',
                 )
@@ -164,6 +176,7 @@ export default function App() {
               setScreen('onboarding')
             }}
             onRestoreBackup={handleRestoreBackup}
+            onDelete={handleDeleteProfile}
           />
         )}
         {screen === 'onboarding' && (

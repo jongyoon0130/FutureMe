@@ -1,6 +1,9 @@
-import type { ReactNode } from 'react'
-import type { SelfProfile, BigFive, Dilemma } from '../../types/self'
+import { useState, type ReactNode } from 'react'
+import type { SelfProfile } from '../../types/self'
 import { INSIGHT_LABELS } from '../../types/self'
+import { FUTURE_YEARS_AHEAD } from '../../lib/brand'
+import { SPEECH_TONE_OPTIONS } from '../../lib/onboardingConfig'
+import { buildProfileDashboard, type DashboardCard } from '../../lib/profileSummary'
 import {
   removeSavedDilemma,
   removeSmallAction,
@@ -17,97 +20,139 @@ interface Props {
   onUpdate?: (p: SelfProfile) => void
 }
 
-const BIG_FIVE_LABELS: { key: keyof BigFive; label: string; invert?: boolean }[] = [
-  { key: 'openness', label: '개방성' },
-  { key: 'conscientiousness', label: '성실성' },
-  { key: 'extraversion', label: '외향성' },
-  { key: 'agreeableness', label: '우호성' },
-  { key: 'neuroticism', label: '정서 안정성', invert: true },
-]
-
-function traitLevel(score: number): string {
-  if (score >= 5) return '높음'
-  if (score <= 3) return '낮음'
-  return '중간'
-}
-
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-3">
-      <h3 className="font-serif text-sm text-accent-dim tracking-wide">{title}</h3>
+    <section className="space-y-2.5">
+      <h3 className="text-[11px] font-medium text-muted uppercase tracking-wider px-0.5">{title}</h3>
       {children}
     </section>
   )
 }
 
-function Row({ label, value }: { label: string; value?: string }) {
-  if (!value?.trim()) return null
+function EditField({
+  label,
+  value,
+  onChange,
+  multiline = false,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  multiline?: boolean
+}) {
+  const cls =
+    'w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:border-accent/50'
   return (
-    <div className="space-y-1">
-      <p className="text-[11px] text-muted uppercase tracking-wider">{label}</p>
-      <p className="text-sm text-ink/90 leading-relaxed whitespace-pre-line">{value.trim()}</p>
-    </div>
-  )
-}
-
-function BigFiveBars({ b }: { b: BigFive }) {
-  return (
-    <div className="space-y-3">
-      {BIG_FIVE_LABELS.map(({ key, label, invert }) => {
-        const raw = b[key]
-        const score = invert ? 8 - raw : raw
-        const pct = Math.round(((score - 1) / 6) * 100)
-        return (
-          <div key={key}>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-ink/80">{label}</span>
-              <span className="text-muted">{traitLevel(score)}</span>
-            </div>
-            <div className="h-1.5 bg-surface rounded-full overflow-hidden border border-border">
-              <div
-                className="h-full bg-gradient-to-r from-glow/80 to-accent rounded-full transition-all"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function DilemmaBlock({ d }: { d: Dilemma }) {
-  return (
-    <div className="p-3 rounded-xl bg-surface border border-border space-y-2">
-      <p className="text-xs text-muted leading-relaxed">{d.prompt}</p>
-      <p className="text-sm text-ink font-medium">→ {d.choice}</p>
-      {d.reason?.trim() && (
-        <p className="text-xs text-ink/70 leading-relaxed border-t border-border pt-2">{d.reason.trim()}</p>
+    <label className="block space-y-1.5">
+      <span className="text-[11px] text-muted">{label}</span>
+      {multiline ? (
+        <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className={`${cls} resize-none leading-relaxed`} />
+      ) : (
+        <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={cls} />
       )}
+    </label>
+  )
+}
+
+function Chip({ children, variant = 'default' }: { children: ReactNode; variant?: 'default' | 'muted' | 'future' }) {
+  const styles = {
+    default: 'bg-accent/12 text-accent border-accent/25',
+    muted: 'bg-ink/[0.04] text-ink/75 border-border/60',
+    future: 'bg-glow/15 text-accent-dim border-glow/30',
+  }
+  return (
+    <span className={`text-[11px] px-2.5 py-1 rounded-full border font-medium ${styles[variant]}`}>{children}</span>
+  )
+}
+
+function StatGrid({ stats }: { stats: { label: string; value: string }[] }) {
+  return (
+    <div className="grid grid-cols-1 gap-2">
+      {stats.map((s) => (
+        <div key={s.label} className="flex items-start justify-between gap-3 py-1.5 border-b border-border/40 last:border-0">
+          <span className="text-[11px] text-muted shrink-0 pt-0.5">{s.label}</span>
+          <span className="text-sm text-ink text-right leading-snug">{s.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DashboardCardView({ card }: { card: DashboardCard }) {
+  const accentBorder =
+    card.accent === 'future'
+      ? 'border-glow/35 bg-gradient-to-br from-glow/8 to-surface-2'
+      : card.accent === 'values'
+        ? 'border-accent/25 bg-gradient-to-br from-accent/6 to-surface-2'
+        : 'border-border/70 bg-surface-2/80'
+
+  return (
+    <article className={`rounded-2xl border p-4 space-y-3 ${accentBorder}`}>
+      <h4 className="text-xs font-semibold text-ink/80">{card.title}</h4>
+
+      {card.headline && (
+        <p className={`text-[15px] font-semibold leading-snug tracking-tight ${card.accent === 'future' ? 'text-ink' : 'text-ink/90'}`}>
+          {card.headline}
+        </p>
+      )}
+
+      {card.chips && card.chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {card.chips.map((c) => (
+            <Chip key={c} variant={card.accent === 'future' ? 'future' : 'default'}>
+              {c}
+            </Chip>
+          ))}
+        </div>
+      )}
+
+      {card.stats && card.stats.length > 0 && <StatGrid stats={card.stats} />}
+    </article>
+  )
+}
+
+function ContinuityBar({ score }: { score: number }) {
+  const pct = Math.round(((score - 1) / 6) * 100)
+  const label = score >= 6 ? '거의 같은 사람' : score >= 4 ? '조금 달라졌지만 나' : '꽤 다른 버전'
+  return (
+    <div className="rounded-2xl border border-border/70 bg-surface-2/80 p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-ink/80">미래 자아 연속성</span>
+        <span className="text-[11px] text-muted">{score}/7</span>
+      </div>
+      <div className="h-2 bg-surface rounded-full overflow-hidden border border-border/40">
+        <div className="h-full bg-gradient-to-r from-accent/70 to-glow rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="text-[11px] text-muted">{label}</p>
     </div>
   )
 }
 
 export function ProfileSheet({ profile: p, onClose, onDelete, onUpdate }: Props) {
-  const rules = p.styleRules
-  const onboardingSamples = p.styleSamples.filter((s) => s.source === 'onboarding')
-  const insights = (p.insights ?? []).filter((i) => i.source === 'ai' || i.count >= 2)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<SelfProfile>(p)
   const editable = !!onUpdate
+  const dash = buildProfileDashboard(editing ? draft : p)
+
+  const insights = (p.insights ?? []).filter((i) => i.source === 'ai' || i.count >= 2)
   const savedDilemmas = p.savedDilemmas ?? []
   const smallActions = p.smallActions ?? []
   const futureNotes = p.futureSelfNotes ?? []
 
-  const styleChips: string[] = []
-  if (rules) {
-    styleChips.push(rules.banmal ? '반말' : '존댓말')
-    if (rules.usesConsonants) styleChips.push('ㅋㅋ/ㅠㅠ')
-    if (rules.usesEmoji) styleChips.push('이모지')
-    if (rules.endings[0]) styleChips.push(rules.endings[0])
+  const saveEdits = () => {
+    if (!onUpdate) return
+    onUpdate({ ...draft, name: draft.name.trim() || '이름 없음' })
+    setEditing(false)
   }
 
-  const completedLabel = p.completedAt
-    ? new Date(p.completedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
-    : null
+  const cancelEdits = () => {
+    setDraft(p)
+    setEditing(false)
+  }
+
+  const patch = (partial: Partial<SelfProfile>) => setDraft((d) => ({ ...d, ...partial }))
+  const patchFuture = (partial: Partial<SelfProfile['future']>) =>
+    setDraft((d) => ({ ...d, future: { ...d.future, ...partial } }))
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-void/40 backdrop-blur-sm animate-fade-up">
@@ -115,250 +160,226 @@ export function ProfileSheet({ profile: p, onClose, onDelete, onUpdate }: Props)
         <header className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <button
             type="button"
-            onClick={onClose}
+            onClick={editing ? cancelEdits : onClose}
             className="text-sm text-muted hover:text-ink px-2 py-1 rounded-lg hover:bg-ink/5"
           >
-            ← 돌아가기
+            {editing ? '취소' : '← 돌아가기'}
           </button>
           <h2 className="text-base font-medium text-ink">내 프로필</h2>
-          <div className="w-16" />
+          {editable && !editing ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(p)
+                setEditing(true)
+              }}
+              className="text-sm text-accent hover:text-accent-dim px-2 py-1 rounded-lg hover:bg-accent/5"
+            >
+              편집
+            </button>
+          ) : editing ? (
+            <button type="button" onClick={saveEdits} className="text-sm text-accent font-medium px-2 py-1 rounded-lg hover:bg-accent/5">
+              저장
+            </button>
+          ) : (
+            <div className="w-10" />
+          )}
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-8">
-          <div className="flex flex-col items-center text-center pb-2">
-            <div className="w-16 h-16 rounded-full chat-avatar flex items-center justify-center text-2xl font-medium mb-3">
-              {p.name[0] ?? '나'}
-            </div>
-            <h1 className="text-2xl font-normal text-ink">{p.name || '이름 없음'}</h1>
-            <p className="text-sm text-muted mt-1">
-              {[p.age ? `${p.age}세` : null, p.mbti || null].filter(Boolean).join(' · ') || '또 다른 나'}
-            </p>
-            {completedLabel && (
-              <p className="text-[11px] text-muted/60 mt-2">프로필 만든 날 · {completedLabel}</p>
-            )}
-          </div>
-
-          <Section title="기본">
-            <div className="p-4 rounded-2xl bg-surface-2 border border-border space-y-4">
-              <Row label="요즘 상황" value={p.lifeContext} />
-              {!p.lifeContext?.trim() && <p className="text-xs text-muted">입력된 내용 없음</p>}
-            </div>
-          </Section>
-
-          <Section title="성격 (Big Five)">
-            <div className="p-4 rounded-2xl bg-surface-2 border border-border">
-              <BigFiveBars b={p.bigFive} />
-            </div>
-          </Section>
-
-          <Section title="가치관 · 선택">
-            <div className="p-4 rounded-2xl bg-surface-2 border border-border space-y-4">
-              <Row label="인생 1순위" value={p.corePriority} />
-              <Row label="잘 산다는 것" value={p.successDef} />
-              <Row label="닮고 싶은 사람" value={p.admire} />
-            </div>
-            {p.dilemmas.length > 0 && (
-              <div className="space-y-2 mt-3">
-                {p.dilemmas.map((d) => (
-                  <DilemmaBlock key={d.id} d={d} />
-                ))}
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+          {editing ? (
+            <>
+              <div className="space-y-3">
+                <EditField label="이름·별명" value={draft.name} onChange={(v) => patch({ name: v })} />
+                <EditField label="나이" value={String(draft.age || '')} onChange={(v) => patch({ age: Number(v) || 0 })} />
               </div>
-            )}
-          </Section>
-
-          <Section title="나의 이야기">
-            <div className="p-4 rounded-2xl bg-surface-2 border border-border space-y-4">
-              <Row label="인생의 전환점" value={p.turningPoint} />
-              <Row label="뿌듯했던 순간" value={p.proudMoment} />
-              <Row label="힘들었던 순간" value={p.stressMoment} />
-              <Row label="남을 위로했던 기억" value={p.comfortMemory} />
-              <Row label="나를 위로하는 말" value={p.comfortTarget} />
-            </div>
-          </Section>
-
-          {(p.fear?.trim() || p.desire?.trim() || p.avoidance?.trim() || p.growthDirection?.trim()) && (
-            <Section title="성장 축">
-              <div className="p-4 rounded-2xl bg-surface-2 border border-border space-y-4">
-                <Row label="두려움 · 회피" value={p.fear} />
-                <Row label="자꾸 미루는 것" value={p.avoidance} />
-                <Row label="진짜 원하는 것" value={p.desire} />
-                <Row label="되고 싶은 나" value={p.growthDirection} />
-              </div>
-            </Section>
-          )}
-
-          {savedDilemmas.length > 0 && (
-            <Section title="저장한 고민">
-              <div className="space-y-2">
-                {savedDilemmas.map((d) => (
-                  <div
-                    key={d.id}
-                    className="p-3 rounded-xl bg-surface-2 border border-border flex items-start gap-2"
-                  >
-                    <span
-                      className={`text-sm leading-relaxed flex-1 ${
-                        d.status === 'resolved' ? 'text-muted line-through' : 'text-ink/90'
-                      }`}
+              <Section title="지금의 나">
+                <div className="rounded-2xl border border-border bg-surface-2/80 p-4 space-y-3">
+                  <EditField label="역할·상황" value={draft.currentRole ?? ''} onChange={(v) => patch({ currentRole: v })} />
+                  <EditField label="요즘 하루" value={draft.lifeContext} onChange={(v) => patch({ lifeContext: v })} multiline />
+                  <EditField label="절대 못 놓는 것" value={draft.corePriority} onChange={(v) => patch({ corePriority: v })} multiline />
+                  <EditField label="잘 산다는 것" value={draft.successDef} onChange={(v) => patch({ successDef: v })} multiline />
+                  <EditField label="1년 뒤 되고 싶은 나" value={draft.growthDirection ?? ''} onChange={(v) => patch({ growthDirection: v })} multiline />
+                  <EditField label="두려움·회피" value={draft.fear ?? ''} onChange={(v) => patch({ fear: v })} multiline />
+                  <EditField label="속으로 원하는 것" value={draft.desire ?? ''} onChange={(v) => patch({ desire: v })} multiline />
+                  <label className="block space-y-1.5">
+                    <span className="text-[11px] text-muted">미래의 나 말투</span>
+                    <select
+                      value={draft.speechTone ?? ''}
+                      onChange={(e) => patch({ speechTone: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface text-sm text-ink focus:outline-none focus:border-accent/50"
                     >
-                      {d.text}
-                    </span>
-                    {editable && (
-                      <button
-                        type="button"
-                        onClick={() => onUpdate?.(removeSavedDilemma(p, d.id))}
-                        className="shrink-0 text-muted hover:text-status-error text-xs px-1"
-                        aria-label="고민 삭제"
-                      >
-                        ✕
-                      </button>
-                    )}
+                      <option value="">선택 안 함</option>
+                      {SPEECH_TONE_OPTIONS.map((o) => (
+                        <option key={o} value={o}>
+                          {o}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </Section>
+              <Section title={`${FUTURE_YEARS_AHEAD}년 뒤 미래의 나`}>
+                <div className="rounded-2xl border border-border bg-surface-2/80 p-4 space-y-3">
+                  <EditField label="5년 뒤 한 줄" value={draft.future.identityLine} onChange={(v) => patchFuture({ identityLine: v })} />
+                  <EditField label="지금→5년 경로" value={draft.future.throughline} onChange={(v) => patchFuture({ throughline: v })} multiline />
+                  <EditField label="평범한 하루" value={draft.future.typicalDay} onChange={(v) => patchFuture({ typicalDay: v })} multiline />
+                  <EditField label="미래의 나 → 지금 편지" value={draft.future.adviceLine} onChange={(v) => patchFuture({ adviceLine: v })} multiline />
+                </div>
+              </Section>
+            </>
+          ) : (
+            <>
+              {/* Hero */}
+              <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/8 via-surface to-surface-2 p-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl chat-avatar flex items-center justify-center text-xl font-semibold shrink-0 shadow-sm">
+                    {p.name[0] ?? '나'}
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-xl font-semibold text-ink truncate">{p.name || '이름 없음'}</h1>
+                    <p className="text-sm text-muted mt-0.5 truncate">
+                      {[p.age ? `${p.age}세` : null, dash.roleShort].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                </div>
+                {dash.tagline && <p className="text-sm text-ink/80 mt-4 leading-relaxed">{dash.tagline}</p>}
+                {(dash.focusChips.length > 0 || dash.traitChips.length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {dash.focusChips.map((c) => (
+                      <Chip key={c}>{c}</Chip>
+                    ))}
+                    {dash.traitChips.map((c) => (
+                      <Chip key={c} variant="muted">
+                        {c}
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick stats */}
+              {(dash.adviceTone || (dash.continuityScore != null && dash.continuityScore <= 0)) && (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {dash.adviceTone && (
+                    <div className="rounded-xl border border-border/60 bg-surface-2/60 px-3 py-2.5 col-span-2 sm:col-span-1">
+                      <p className="text-[10px] text-muted uppercase tracking-wide">조언 톤</p>
+                      <p className="text-sm font-medium text-ink mt-0.5">{dash.adviceTone}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {dash.continuityScore != null && dash.continuityScore > 0 && <ContinuityBar score={dash.continuityScore} />}
+
+              {/* Dashboard cards */}
+              <div className="space-y-3">
+                {dash.cards.map((card) => (
+                  <DashboardCardView key={card.id} card={card} />
                 ))}
               </div>
-            </Section>
-          )}
 
-          {smallActions.length > 0 && (
-            <Section title="작은 행동">
-              <div className="space-y-2">
-                {smallActions.map((a) => (
-                  <div
-                    key={a.id}
-                    className="p-3 rounded-xl bg-surface-2 border border-border flex items-center gap-2.5"
-                  >
+              {savedDilemmas.length > 0 && (
+                <Section title="저장한 고민">
+                  <div className="space-y-2">
+                    {savedDilemmas.map((d) => (
+                      <div key={d.id} className="p-3 rounded-xl bg-surface-2/80 border border-border/70 flex items-start gap-2">
+                        <span className={`text-sm leading-snug flex-1 ${d.status === 'resolved' ? 'text-muted line-through' : 'text-ink/90'}`}>
+                          {d.text}
+                        </span>
+                        {editable && (
+                          <button type="button" onClick={() => onUpdate?.(removeSavedDilemma(p, d.id))} className="shrink-0 text-muted hover:text-status-error text-xs px-1" aria-label="고민 삭제">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {smallActions.length > 0 && (
+                <Section title="작은 행동">
+                  <div className="space-y-2">
+                    {smallActions.map((a) => (
+                      <div key={a.id} className="p-3 rounded-xl bg-surface-2/80 border border-border/70 flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => onUpdate?.(toggleSmallAction(p, a.id))}
+                          disabled={!editable}
+                          className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center text-[11px] ${
+                            a.done ? 'border-accent bg-accent text-surface' : 'border-muted/50 text-transparent'
+                          }`}
+                          aria-label={a.done ? '완료 해제' : '완료 표시'}
+                        >
+                          ✓
+                        </button>
+                        <span className={`text-sm flex-1 leading-snug ${a.done ? 'text-muted line-through' : 'text-ink/90'}`}>{a.text}</span>
+                        {editable && (
+                          <button type="button" onClick={() => onUpdate?.(removeSmallAction(p, a.id))} className="shrink-0 text-muted hover:text-status-error text-xs px-1" aria-label="행동 삭제">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {futureNotes.length > 0 && (
+                <Section title="미래의 나 메모">
+                  <div className="space-y-2">
+                    {futureNotes.map((n) => (
+                      <div key={n.id} className="p-3 rounded-xl bg-surface-2/80 border border-border/70 flex items-start gap-2">
+                        <span className="text-sm text-ink/90 leading-snug flex-1">{n.text}</span>
+                        {editable && (
+                          <button type="button" onClick={() => onUpdate?.(removeFutureSelfNote(p, n.id))} className="shrink-0 text-muted hover:text-status-error text-xs px-1" aria-label="메모 삭제">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {insights.length > 0 && (
+                <Section title="대화에서 알게 된 것">
+                  <div className="space-y-2">
+                    {insights.slice(0, 6).map((i) => (
+                      <div key={i.id} className="p-3 rounded-xl bg-surface-2/80 border border-border/70 flex gap-2 items-start">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-glow/10 text-glow border border-glow/20 whitespace-nowrap h-fit">
+                          {INSIGHT_LABELS[i.kind]}
+                        </span>
+                        <span className="text-sm text-ink/80 leading-snug flex-1">{i.text}</span>
+                        {editable && (
+                          <button type="button" onClick={() => onUpdate?.(removeInsight(p, i.id))} className="shrink-0 text-muted hover:text-status-error text-xs px-1" aria-label="삭제">
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {editable && (
                     <button
                       type="button"
-                      onClick={() => onUpdate?.(toggleSmallAction(p, a.id))}
-                      disabled={!editable}
-                      className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center text-[11px] ${
-                        a.done ? 'border-accent bg-accent text-surface' : 'border-muted/50 text-transparent'
-                      }`}
-                      aria-label={a.done ? '완료 해제' : '완료 표시'}
+                      onClick={() => {
+                        if (window.confirm('대화에서 관찰한 기억을 전부 지울까요?\n(온보딩 프로필·대화 내용은 그대로예요.)')) {
+                          onUpdate?.(clearInsights(p))
+                        }
+                      }}
+                      className="mt-2 text-xs text-muted hover:text-status-error underline"
                     >
-                      ✓
+                      기억 전체 지우기
                     </button>
-                    <span
-                      className={`text-sm flex-1 leading-relaxed ${
-                        a.done ? 'text-muted line-through' : 'text-ink/90'
-                      }`}
-                    >
-                      {a.text}
-                    </span>
-                    {editable && (
-                      <button
-                        type="button"
-                        onClick={() => onUpdate?.(removeSmallAction(p, a.id))}
-                        className="shrink-0 text-muted hover:text-status-error text-xs px-1"
-                        aria-label="행동 삭제"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {futureNotes.length > 0 && (
-            <Section title="미래의 나 메모">
-              <div className="space-y-2">
-                {futureNotes.map((n) => (
-                  <div
-                    key={n.id}
-                    className="p-3 rounded-xl bg-surface-2 border border-border flex items-start gap-2"
-                  >
-                    <span className="text-sm text-ink/90 leading-relaxed flex-1">{n.text}</span>
-                    {editable && (
-                      <button
-                        type="button"
-                        onClick={() => onUpdate?.(removeFutureSelfNote(p, n.id))}
-                        className="shrink-0 text-muted hover:text-status-error text-xs px-1"
-                        aria-label="메모 삭제"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          <Section title="말투">
-            <div className="p-4 rounded-2xl bg-surface-2 border border-border space-y-3">
-              {styleChips.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {styleChips.map((c) => (
-                    <span
-                      key={c}
-                      className="text-xs px-2.5 py-1 rounded-full bg-accent/10 text-accent border border-accent/20"
-                    >
-                      {c}
-                    </span>
-                  ))}
-                </div>
+                  )}
+                </Section>
               )}
-              {onboardingSamples.length > 0 ? (
-                <div className="space-y-2 pt-1">
-                  <p className="text-[11px] text-muted">온보딩 때 쓴 말</p>
-                  {onboardingSamples.map((s, i) => (
-                    <p key={i} className="text-sm text-ink/80 leading-relaxed pl-3 border-l-2 border-accent/30">
-                      {s.text}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                !styleChips.length && <p className="text-xs text-muted">아직 수집된 말투 샘플 없음</p>
-              )}
-            </div>
-          </Section>
-
-          {insights.length > 0 && (
-            <Section title="대화에서 알게 된 것">
-              <div className="space-y-2">
-                {insights.slice(0, 8).map((i) => (
-                  <div key={i.id} className="p-3 rounded-xl bg-surface-2 border border-border flex gap-2 items-start">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-glow/10 text-glow border border-glow/20 whitespace-nowrap h-fit">
-                      {INSIGHT_LABELS[i.kind]}
-                    </span>
-                    <span className="text-sm text-ink/80 leading-relaxed flex-1">{i.text}</span>
-                    {editable && (
-                      <button
-                        type="button"
-                        onClick={() => onUpdate?.(removeInsight(p, i.id))}
-                        className="shrink-0 text-muted hover:text-status-error text-xs px-1"
-                        aria-label="이건 내가 아니야 — 삭제"
-                        title="이건 내가 아니야"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {editable && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        '대화에서 관찰한 기억을 전부 지울까요?\n(온보딩 프로필·대화 내용은 그대로예요.)',
-                      )
-                    ) {
-                      onUpdate?.(clearInsights(p))
-                    }
-                  }}
-                  className="mt-2 text-xs text-muted hover:text-status-error underline"
-                >
-                  기억 전체 지우기
-                </button>
-              )}
-            </Section>
+            </>
           )}
         </div>
 
-        {onDelete && (
+        {onDelete && !editing && (
           <div className="px-5 py-4 border-t border-border shrink-0">
             <button
               type="button"

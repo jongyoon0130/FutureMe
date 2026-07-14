@@ -28,6 +28,15 @@ export function stripApiTurnTimestampFromContent(content: string): string {
   return parts.map((p) => stripApiTurnTimestampPrefix(p.trim())).filter(Boolean).join('\n\n')
 }
 
+/** 채팅방 목록 미리보기 — API 시각 접두어·속마음 태그 제거 */
+export function formatListPreview(content: string, maxLen = 80): string {
+  let t = stripApiTurnTimestampFromContent(content)
+  t = t.replace(/^\[나의\s*속마음\]\s*/g, '').replace(/\s+/g, ' ').trim()
+  if (!t) return ''
+  if (t.length <= maxLen) return t
+  return `${t.slice(0, maxLen - 1)}…`
+}
+
 /** 시스템 프롬프트용 현재 시각 (기기 로컬 타임존) */
 export function nowContextKo(): string {
   const d = new Date()

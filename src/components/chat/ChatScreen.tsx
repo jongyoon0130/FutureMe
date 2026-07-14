@@ -5,7 +5,7 @@ import { Button } from '../ui'
 import { ProfileSheet } from '../profile/ProfileSheet'
 import { ThemePicker } from '../theme/ThemePicker'
 import { ChatMessageList } from './ChatMessageList'
-import { splitMessageParagraphs, formatChatTime } from '../../lib/chatDisplay'
+import { splitMessageParagraphs, formatChatTime, stripApiTurnTimestampFromContent } from '../../lib/chatDisplay'
 import {
   buildReplyPlan,
   insertReplyAfterUser,
@@ -409,7 +409,7 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     const selfMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'self',
-      content: reply,
+      content: stripApiTurnTimestampFromContent(reply.trim()),
       timestamp: Date.now(),
     }
     const segments = splitMessageParagraphs(reply)

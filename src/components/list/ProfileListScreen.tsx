@@ -4,20 +4,35 @@ import { formatListTime, type ProfileSummary } from '../../lib/storage'
 import { useAuth } from '../../contexts/AuthContext'
 import { ThemePicker } from '../theme/ThemePicker'
 import { FutureMeLogo } from '../brand/FutureMeLogo'
+import { SwipeableListRow } from './SwipeableListRow'
 
 interface Props {
   summaries: ProfileSummary[]
   onSelect: (id: string) => void
   onCreateNew: () => void
   onRestoreBackup: (file: File) => void | Promise<void>
+  onDelete: (id: string) => void | Promise<void>
 }
 
-export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreBackup }: Props) {
+export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreBackup, onDelete }: Props) {
   const { configured, user, signOut, uploadLocalData, syncing, lastSync } = useAuth()
   const hasProfiles = summaries.length > 0
   const importRef = useRef<HTMLInputElement>(null)
   const [importStatus, setImportStatus] = useState<'idle' | 'loading' | 'fail'>('idle')
   const [accountOpen, setAccountOpen] = useState(false)
+  const [openRowId, setOpenRowId] = useState<string | null>(null)
+
+  const handleDelete = async (summary: ProfileSummary) => {
+    if (
+      !window.confirm(
+        `'${summary.name}' 채팅방을 삭제할까요?\n대화와 프로필이 이 기기·클라우드에서 지워져요.`,
+      )
+    ) {
+      return
+    }
+    setOpenRowId(null)
+    await onDelete(summary.id)
+  }
 
   const handleImportFile = async (file: File) => {
     setImportStatus('loading')
@@ -183,22 +198,28 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
           <ul className="flex-1 overflow-y-auto divide-y divide-border/60">
             {summaries.map((s) => (
               <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(s.id)}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-ink/[0.03] active:bg-ink/[0.05] transition-colors text-left"
+                <SwipeableListRow
+                  open={openRowId === s.id}
+                  onOpenChange={(open) => {
+                    if (open) setOpenRowId(s.id)
+                    else if (openRowId === s.id) setOpenRowId(null)
+                  }}
+                  onPress={() => onSelect(s.id)}
+                  onDelete={() => void handleDelete(s)}
                 >
-                  <div className="w-11 h-11 rounded-2xl chat-avatar flex items-center justify-center text-base font-medium shrink-0">
-                    {s.name[0] ?? '나'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                      <span className="font-medium text-ink truncate">{s.name}</span>
-                      <span className="text-[11px] text-muted shrink-0">{formatListTime(s.updatedAt)}</span>
+                  <div className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-ink/[0.03] active:bg-ink/[0.05] transition-colors text-left">
+                    <div className="w-11 h-11 rounded-2xl chat-avatar flex items-center justify-center text-base font-medium shrink-0">
+                      {s.name[0] ?? '나'}
                     </div>
-                    <p className="text-sm text-muted truncate leading-snug">{s.preview}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                        <span className="font-medium text-ink truncate">{s.name}</span>
+                        <span className="text-[11px] text-muted shrink-0">{formatListTime(s.updatedAt)}</span>
+                      </div>
+                      <p className="text-sm text-muted truncate leading-snug">{s.preview}</p>
+                    </div>
                   </div>
-                </button>
+                </SwipeableListRow>
               </li>
             ))}
           </ul>

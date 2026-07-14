@@ -7,7 +7,7 @@ import type {
   Insight,
   InsightKind,
 } from '../types/self'
-import { BIG_FIVE_ITEMS, INSIGHT_LABELS } from '../types/self'
+import { BIG_FIVE_ITEMS, INSIGHT_LABELS, LIFE_DOMAIN_LABELS } from '../types/self'
 import { formatApiTurnTimestamp, nowContextKo } from './chatDisplay'
 import { FUTURE_YEARS_AHEAD } from './brand'
 
@@ -113,6 +113,11 @@ function describePersonUnderstanding(p: SelfProfile): string {
 function describePersonUnderstandingCompact(p: SelfProfile): string {
   const parts: string[] = []
   if (p.lifeContext?.trim()) parts.push(`요즘: ${p.lifeContext.trim().slice(0, 60)}`)
+  if (p.speechTone?.trim()) parts.push(`톤: ${p.speechTone.trim()}`)
+  if (p.concernDomains?.length) {
+    parts.push(`관심: ${p.concernDomains.map((d) => LIFE_DOMAIN_LABELS[d] ?? d).join(', ')}`)
+  }
+  if (p.currentRole?.trim()) parts.push(`역할: ${p.currentRole.trim().slice(0, 40)}`)
   parts.push('성격 분석보다 이번 말의 상황·감정·선택을 우선')
   return parts.join(' · ')
 }
@@ -257,20 +262,22 @@ export function collectStyleSamples(p: SelfProfile): StyleSample[] {
   const push = (register: Register, text: string) => {
     if (text && text.trim().length > 1) out.push({ register, text: text.trim(), source: src, at: now })
   }
+  push('casual', p.styleSample ?? '')
+  push('casual', p.currentRole ?? '')
   push('casual', p.lifeContext)
   push('reflective', p.corePriority)
   push('reflective', p.successDef)
-  push('reflective', p.admire)
   for (const d of p.dilemmas) push('reflective', d.reason)
-  push('reflective', p.turningPoint)
-  push('joyful', p.proudMoment)
   push('venting', p.stressMoment)
-  push('comforting', p.comfortMemory)
   push('comforting', p.comfortTarget)
   push('venting', p.fear ?? '')
   push('reflective', p.desire ?? '')
-  push('reflective', p.avoidance ?? '')
   push('reflective', p.growthDirection ?? '')
+  if (p.speechTone?.trim()) push('casual', p.speechTone)
+  if (p.future?.identityLine?.trim()) push('reflective', p.future.identityLine)
+  if (p.future?.futureVoiceSample?.trim()) push('comforting', p.future.futureVoiceSample)
+  if (p.future?.adviceLine?.trim()) push('comforting', p.future.adviceLine)
+  if (p.future?.typicalDay?.trim()) push('reflective', p.future.typicalDay.slice(0, 120))
   return out
 }
 
@@ -1155,20 +1162,45 @@ function describeFutureSelf(p: SelfProfile): string {
   if (!f) return '- (미래 프로필 없음)'
 
   const lines: string[] = []
-  const add = (label: string, v?: string) => {
-    const t = v?.trim()
-    if (t) lines.push(`- ${label}: "${t}"`)
+  const add = (label: string, v?: string | number) => {
+    if (typeof v === 'number' && v > 0) lines.push(`- ${label}: ${v}/7`)
+    else {
+      const t = typeof v === 'string' ? v.trim() : ''
+      if (t) lines.push(`- ${label}: "${t}"`)
+    }
   }
 
-  add(`${FUTURE_YEARS_AHEAD}년 뒤 직업·일`, f.career)
-  add('경제·재산', f.income)
-  add('관계·가족', f.relationship)
-  add('건강·몸', f.health)
-  add('하루·라이프스타일', f.lifestyle)
+  add(`${FUTURE_YEARS_AHEAD}년 뒤 정체성`, f.identityLine)
+  add('평범한 하루 (생생함)', f.typicalDay)
+  add('Future memory — 지금→5년 경로', f.throughline)
+  add('직업·일', f.career)
+  add('업무/공부 루틴', f.careerDaily)
+  add('경제·돈', f.income)
+  add('관계', f.relationship)
+  add('건강', f.health)
+  add('사는 곳·라이프', f.homeLife)
   add('가장 자랑스러운 성취', f.achievement)
-  add('5년 지나며 배운 것', f.lesson)
-  add('지금의 나에게 해주고 싶은 말', f.advice)
-  add('미래의 나 말투·성격', f.voiceNote)
+  add('넘어선 어려움', f.obstacleOvercome)
+  add('배운 핵심', f.lesson)
+  if (f.thrivingDomains?.length) {
+    lines.push(`- 잘 풀렸으면 하는 영역: ${f.thrivingDomains.map((d) => LIFE_DOMAIN_LABELS[d] ?? d).join(', ')}`)
+  }
+  if (f.fearedSelves?.length) lines.push(`- 피하고 싶은 미래: ${f.fearedSelves.join(', ')}`)
+  add('그렇게 될 뻔했던 길', f.avoidedPath)
+  add('지금 걱정 → 별거 아니었던 것', f.regretThatWasnt)
+  if (f.traitsShift?.length) lines.push(`- 변한 태도·성격: ${f.traitsShift.join(', ')}`)
+  add('미래의 나 말투 샘플', f.futureVoiceSample)
+  if (f.adviceLine?.trim()) {
+    lines.push(`- 지금의 나에게 편지 (${f.adviceTone}): "${f.adviceLine.trim()}"`)
+  }
+  add('미래 자아 연속성', f.continuityScore)
+  if (f.weeklyAction?.trim()) add('이번 주 작은 행동', f.weeklyAction)
+  if (f.askAbout) lines.push(`- 자주 묻고 싶은 주제: ${LIFE_DOMAIN_LABELS[f.askAbout] ?? f.askAbout}`)
+  if (p.speechTone?.trim()) lines.push(`- user가 선호하는 대화 톤: ${p.speechTone.trim()}`)
+  if (p.styleSample?.trim()) {
+    const s = p.styleSample.trim()
+    lines.push(`- user 말투 샘플(참고): "${s.length > 80 ? `${s.slice(0, 80)}…` : s}"`)
+  }
 
   return lines.length
     ? lines.join('\n')
@@ -1181,7 +1213,7 @@ export type TalkBackMode = 'reflect' | 'future' | 'courage'
 const MODE_OVERLAY: Record<TalkBackMode, string> = {
   reflect: '',
   future:
-    '\n## 지금은 "미래의 나" 관점\n- 너는 이 고민을 이미 지나온 1년 뒤의 나다. 예언·점쟁이 금지. 대신 "지나와 보니 뭐가 남고 뭐가 사소했는지"의 눈으로 지금 나에게 말한다.\n- 지금의 나보다 조금 더 차분하고 담담하게. ㅋㅋ/ㅠㅠ·과한 리액션은 줄인다.\n- "그때의 나한테 해주고 싶은 말은" 같은 톤으로 한 걸음 앞을 짚는다.',
+    `\n## 지금은 "${FUTURE_YEARS_AHEAD}년 뒤 미래의 나" 관점\n- 너는 user가 온보딩에서 만든 **${FUTURE_YEARS_AHEAD}년 뒤의 나**다. 예언·점쟁이 금지.\n- Future memory(throughline)·typicalDay·futureVoiceSample을 **말투·기억의 뼈대**로 삼되, 온보딩 문장을 그대로 낭독하지 말 것.\n- 지금의 나보다 담담하고 경험에서 온 말투. ㅋㅋ/ㅠㅠ는 줄이되, user styleSample과의 **연속성**은 유지.\n- "그때의 나한테 해주고 싶은 말" 톤으로, 이미 그 길을 걸어온 사람처럼 말한다.`,
   courage:
     '\n## 지금은 "용기" 관점\n- user가 방금 작은 실행 하나를 정했거나, 미루는 중이다. 판단·공감은 딱 1문장까지만.\n- 나머지는 짧게 밀어주기·격려. 거창한 계획·여러 선택지 금지.\n- 행동명을 작은따옴표+대시(`\'…\' —`)로 되따라치지 말 것. 행동과 안 맞으면 "5분" 같은 시간을 붙이지 말 것.',
 }
@@ -1229,7 +1261,11 @@ export function buildSystemPrompt(
   const concretizing =
     analysis.vague || analysis.inConcretizationFlow || analysis.needs.includes('concretize')
 
-  const modeOverlay = MODE_OVERLAY[mode]
+  const modeOverlay =
+    MODE_OVERLAY[mode] +
+    (mode === 'future' && p.speechTone?.trim()
+      ? `\n- user가 선호하는 대화 톤: **${p.speechTone.trim()}** — 이 느낌에 맞출 것.`
+      : '')
   const growthTouch = !lite && userMessage ? describeGrowthTouch(p, userMessage) : ''
   const growthTouchLine = growthTouch ? `\n- ${growthTouch}` : ''
   const growthCtx = deep ? describeGrowthContext(p) : ''

@@ -1,6 +1,8 @@
 import type { SelfProfile, ChatMessage } from '../types/self'
-import { emptyFutureSelf } from '../types/self'
+import { emptyFutureSelf, normalizeFutureSelf } from '../types/self'
 import { resolveModel } from './selfEngine'
+import { formatListPreview } from './chatDisplay'
+import { buildDefaultListPreview } from './profileSummary'
 import {
   deleteChatFromDb,
   loadChatFromDb,
@@ -16,20 +18,20 @@ const LEGACY_CHAT_KEY = 'aime-self-chat'
 const LEGACY_INDEX_KEY = 'aime-profiles-index'
 const LEGACY_API_KEY_KEY = 'aime-gemini-key'
 const LEGACY_MODEL_KEY = 'aime-gemini-model'
-const LEGACY_ONBOARDING_KEY = 'aime-onboarding-progress'
 const LEGACY_PROFILE_PREFIX = 'aime-profile-'
 
 const INDEX_KEY = 'futureme-profiles-index'
 const API_KEY_KEY = 'futureme-gemini-key'
 const MODEL_KEY = 'futureme-gemini-model'
 const API_CHECK_CACHE_KEY = 'futureme-api-check-cache'
-const ONBOARDING_KEY = 'futureme-onboarding-progress'
+export const ONBOARDING_PROGRESS_KEY = 'futureme-onboarding-v4'
+export const ONBOARDING_PROGRESS_VERSION = 4
+const ONBOARDING_KEY = ONBOARDING_PROGRESS_KEY
 
 /** TalkBack / 구 aime-* 마이그레이션 */
 const LEGACY_TALKBACK_INDEX = 'talkback-profiles-index'
 const LEGACY_TALKBACK_API_KEY = 'talkback-gemini-key'
 const LEGACY_TALKBACK_MODEL = 'talkback-gemini-model'
-const LEGACY_TALKBACK_ONBOARDING = 'talkback-onboarding-progress'
 const LEGACY_TALKBACK_PROFILE_PREFIX = 'talkback-profile-'
 const LEGACY_AIME_API_KEY = 'aime-gemini-key'
 const LEGACY_AIME_MODEL = 'aime-gemini-model'
@@ -59,8 +61,7 @@ function migrateLegacyStorageKeys(): void {
   copyIfMissing(LEGACY_MODEL_KEY, MODEL_KEY)
   copyIfMissing(LEGACY_TALKBACK_MODEL, MODEL_KEY)
   copyIfMissing(LEGACY_AIME_MODEL, MODEL_KEY)
-  copyIfMissing(LEGACY_ONBOARDING_KEY, ONBOARDING_KEY)
-  copyIfMissing(LEGACY_TALKBACK_ONBOARDING, ONBOARDING_KEY)
+  // 온보딩 진행은 단계 구조가 바뀔 때마다 새 키로 시작 — 구버전 이어하기는 하지 않음
 
   for (const prefix of [LEGACY_PROFILE_PREFIX, LEGACY_TALKBACK_PROFILE_PREFIX]) {
     for (let i = 0; i < localStorage.length; i++) {
@@ -97,6 +98,7 @@ export function loadProfileById(id: string): SelfProfile | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as SelfProfile
     if (!parsed.future) parsed.future = emptyFutureSelf()
+    else parsed.future = normalizeFutureSelf(parsed.future)
     return parsed
   } catch {
     return null
@@ -122,15 +124,14 @@ export function saveProfileRecord(
   const summaries = loadProfileSummaries()
   const idx = summaries.findIndex((s) => s.id === profile.id)
   const fallbackPreview =
-    preview?.trim() ||
-    profile.lifeContext?.trim().slice(0, 60) ||
-    '미래의 나와 대화를 시작해보세요'
+    (preview?.trim() ? formatListPreview(preview) : '') ||
+    buildDefaultListPreview(profile)
 
   if (idx >= 0) {
     summaries[idx] = {
       id: profile.id,
       name: profile.name || '이름 없음',
-      preview: preview?.trim() ? preview.slice(0, 80) : summaries[idx].preview || fallbackPreview,
+      preview: preview?.trim() ? formatListPreview(preview) : summaries[idx].preview || fallbackPreview,
       updatedAt: lastMessageAt ?? summaries[idx].updatedAt,
     }
   } else {
@@ -156,7 +157,7 @@ export function updateProfilePreview(id: string, preview: string, lastMessageAt:
   const summaries = loadProfileSummaries()
   const idx = summaries.findIndex((s) => s.id === id)
   if (idx < 0) return
-  summaries[idx].preview = preview.slice(0, 80)
+  summaries[idx].preview = formatListPreview(preview)
   summaries[idx].updatedAt = lastMessageAt
   summaries.sort((a, b) => b.updatedAt - a.updatedAt)
   saveProfileSummaries(summaries)
@@ -280,7 +281,7 @@ export function touchProfilePreviewOnly(profileId: string, preview: string): voi
   const summaries = loadProfileSummaries()
   const idx = summaries.findIndex((s) => s.id === profileId)
   if (idx < 0) return
-  summaries[idx].preview = preview.slice(0, 80)
+  summaries[idx].preview = formatListPreview(preview)
   saveProfileSummaries(summaries)
 }
 
@@ -298,7 +299,7 @@ export async function reconcileProfileSummariesFromChats(): Promise<void> {
     if (!messages.length) continue
 
     const last = messages[messages.length - 1]
-    const preview = last.content.slice(0, 80)
+    const preview = formatListPreview(last.content)
     if (s.updatedAt !== last.timestamp || s.preview !== preview) {
       next[i] = { ...s, updatedAt: last.timestamp, preview }
       changed = true

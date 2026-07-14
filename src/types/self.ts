@@ -101,38 +101,179 @@ export interface FutureSelfNote {
   sourceMessageId?: string
 }
 
+/** 미래의 나 온보딩 — 인생 영역 */
+export type LifeDomain = 'work' | 'money' | 'relationship' | 'health' | 'growth' | 'meaning'
+
+export const LIFE_DOMAIN_LABELS: Record<LifeDomain, string> = {
+  work: '일·커리어',
+  money: '돈',
+  relationship: '관계·연애',
+  health: '건강',
+  growth: '자기성장',
+  meaning: '의미·방향',
+}
+
+export type AdviceTone = 'comfort' | 'tough' | 'cheer' | 'real'
+
+export const ADVICE_TONE_LABELS: Record<AdviceTone, string> = {
+  comfort: '위로',
+  tough: '따끔',
+  cheer: '응원',
+  real: '현실직설',
+}
+
 export interface FutureSelfProfile {
-  /** 5년 뒤 직업·일 */
+  /** 5년 뒤 정체성 한 줄 */
+  identityLine: string
+  /** 생생함: 평범한 하루 묘사 (Future You vividness) */
+  typicalDay: string
+  /** Future memory: 지금→5년 후까지의 이야기 (throughline) */
+  throughline: string
+  /** 일·커리어 */
   career: string
-  /** 연봉·재산·경제 상태 */
+  /** 업무/공부 하루 루틴 */
+  careerDaily: string
+  /** 경제·돈 */
   income: string
-  /** 가족·연애·관계 */
+  /** 관계 */
   relationship: string
-  /** 건강·몸·컨디션 */
+  /** 건강·몸 */
   health: string
-  /** 하루·라이프스타일 */
-  lifestyle: string
+  /** 사는 곳·라이프스타일 */
+  homeLife: string
   /** 가장 자랑스러운 성취 */
   achievement: string
-  /** 5년 지나며 배운 핵심 교훈 */
+  /** 넘어선 어려움 (리얼리즘) */
+  obstacleOvercome: string
+  /** 배운 핵심 */
   lesson: string
-  /** 지금의 나에게 꼭 해주고 싶은 말 */
-  advice: string
-  /** 미래의 나 말투·성격 (지금보다 어떻게 다른지) */
-  voiceNote: string
+  /** 잘 풀렸으면 하는 영역 (앵커) */
+  thrivingDomains: LifeDomain[]
+  /** 피하고 싶은 미래 (칩) */
+  fearedSelves: string[]
+  /** 거의 그렇게 될 뻔했던 길 */
+  avoidedPath: string
+  /** 지금 걱정인데, 5년 뒤 보면 별거 아니었던 것 */
+  regretThatWasnt: string
+  /** 변한 태도·성격 (칩) */
+  traitsShift: string[]
+  /** 미래의 나 말투 샘플 (1인칭으로 직접 작성) */
+  futureVoiceSample: string
+  adviceTone: AdviceTone
+  /** 미래의 나 → 지금의 나 (편지/조언) */
+  adviceLine: string
+  /** 미래 자아 연속성 1–7 */
+  continuityScore: number
+  /** 이번 주 작은 행동 */
+  weeklyAction: string
+  /** 자주 묻고 싶은 주제 */
+  askAbout: LifeDomain
+  /** @deprecated v2 — typicalDay로 통합 */
+  dayScene?: string
+  /** @deprecated v2 */
+  domainSnapshots?: Partial<Record<LifeDomain, string>>
+}
+
+/** 구 온보딩 필드 (마이그레이션용) */
+interface LegacyFutureSelfFields {
+  career?: string
+  income?: string
+  relationship?: string
+  health?: string
+  lifestyle?: string
+  achievement?: string
+  lesson?: string
+  advice?: string
+  voiceNote?: string
 }
 
 export function emptyFutureSelf(): FutureSelfProfile {
   return {
+    identityLine: '',
+    typicalDay: '',
+    throughline: '',
     career: '',
+    careerDaily: '',
     income: '',
     relationship: '',
     health: '',
-    lifestyle: '',
+    homeLife: '',
     achievement: '',
+    obstacleOvercome: '',
     lesson: '',
-    advice: '',
-    voiceNote: '',
+    thrivingDomains: [],
+    fearedSelves: [],
+    avoidedPath: '',
+    regretThatWasnt: '',
+    traitsShift: [],
+    futureVoiceSample: '',
+    adviceTone: 'comfort',
+    adviceLine: '',
+    continuityScore: 4,
+    weeklyAction: '',
+    askAbout: 'growth',
+  }
+}
+
+export function normalizeFutureSelf(raw: unknown): FutureSelfProfile {
+  const base = emptyFutureSelf()
+  if (!raw || typeof raw !== 'object') return base
+  const f = raw as Partial<FutureSelfProfile> & LegacyFutureSelfFields
+
+  if (typeof f.throughline === 'string' || typeof f.typicalDay === 'string') {
+    return {
+      ...base,
+      ...f,
+      thrivingDomains: f.thrivingDomains ?? [],
+      fearedSelves: f.fearedSelves ?? [],
+      traitsShift: f.traitsShift ?? [],
+      continuityScore: f.continuityScore ?? 4,
+      typicalDay: f.typicalDay?.trim() || f.dayScene?.trim() || '',
+    }
+  }
+
+  if (typeof f.identityLine === 'string' && !f.career) {
+    return {
+      ...base,
+      ...f,
+      thrivingDomains: f.thrivingDomains ?? [],
+      fearedSelves: f.fearedSelves ?? [],
+      traitsShift: f.traitsShift ?? [],
+      continuityScore: f.continuityScore ?? 4,
+      typicalDay: f.dayScene?.trim() ?? '',
+    }
+  }
+
+  const identityLine =
+    [f.achievement, f.career].filter((s) => s?.trim()).join(' · ').slice(0, 80) ||
+    f.career?.trim() ||
+    ''
+  return {
+    ...base,
+    identityLine,
+    typicalDay: f.lifestyle?.trim() ?? f.dayScene?.trim() ?? '',
+    throughline: '',
+    career: f.career?.trim() ?? '',
+    careerDaily: '',
+    income: f.income?.trim() ?? '',
+    relationship: f.relationship?.trim() ?? '',
+    health: f.health?.trim() ?? '',
+    homeLife: f.lifestyle?.trim() ?? '',
+    achievement: f.achievement?.trim() ?? '',
+    obstacleOvercome: '',
+    lesson: f.lesson?.trim() ?? '',
+    thrivingDomains: (
+      [
+        f.career?.trim() && 'work',
+        f.income?.trim() && 'money',
+        f.relationship?.trim() && 'relationship',
+        f.health?.trim() && 'health',
+        f.lifestyle?.trim() && 'meaning',
+      ] as (LifeDomain | false)[]
+    ).filter(Boolean) as LifeDomain[],
+    traitsShift: f.voiceNote?.trim() ? [f.voiceNote.trim()] : [],
+    futureVoiceSample: f.voiceNote?.trim() ?? '',
+    adviceLine: f.advice?.trim() ?? '',
   }
 }
 
@@ -141,7 +282,17 @@ export interface SelfProfile {
   // L0 앵커 (현재의 나)
   name: string
   age: number
+  /** 온보딩: 나이대 칩 */
+  ageBand?: string
   lifeContext: string
+  /** 온보딩: 지금 신경 쓰이는 영역 */
+  concernDomains?: LifeDomain[]
+  /** 온보딩: 대화 톤 */
+  speechTone?: string
+  /** 온보딩: 지금 하는 일·역할 */
+  currentRole?: string
+  /** 온보딩: 말투 학습용 자연어 샘플 */
+  styleSample?: string
   mbti: string // 기본 성향 앵커 (모르면 '')
   /** 5년 뒤 목표하는 미래의 나 */
   future: FutureSelfProfile

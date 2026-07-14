@@ -10,7 +10,7 @@ import {
   saveChatToDb,
   clearLegacyChatDb,
 } from './chatDb'
-import { isCloudSyncAvailable, pushProfileToCloud, pushChatToCloud, pushSettingsToCloud, deleteProfileFromCloud } from './cloudSync'
+import { isCloudSyncAvailable, pushProfileToCloud, pushChatToCloud, pushSettingsToCloud, tombstoneProfileInCloud } from './cloudSync'
 
 /** 구버전 localStorage 키 (`aime-*` — 초기 프로젝트명 시절) */
 const LEGACY_PROFILE_KEY = 'aime-self-profile'
@@ -44,6 +44,56 @@ export interface ProfileSummary {
 }
 
 const profileKey = (id: string) => `futureme-profile-${id}`
+
+// ---------------------------------------------------------------------------
+// 삭제 기록 (tombstone) — "지운 것이 되살아나면 안 된다"
+// 삭제한 프로필 ID와 삭제 시각을 기억해 두고, 동기화 병합 때 클라우드 복사본이
+// 삭제보다 오래됐으면 다시 내려받지 않는다. (syncOrchestrator에서 사용)
+// ---------------------------------------------------------------------------
+
+const TOMBSTONE_KEY = 'futureme-profile-tombstones'
+/** 이보다 오래된 tombstone은 정리 — localStorage가 무한히 쌓이지 않게 */
+const TOMBSTONE_TTL_MS = 1000 * 60 * 60 * 24 * 180
+
+export function loadProfileTombstones(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(TOMBSTONE_KEY)
+    if (!raw) return {}
+    const data = JSON.parse(raw) as Record<string, unknown>
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS
+    const valid: Record<string, number> = {}
+    let dropped = false
+    for (const [id, at] of Object.entries(data)) {
+      if (typeof at === 'number' && at >= cutoff) valid[id] = at
+      else dropped = true
+    }
+    if (dropped) localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(valid))
+    return valid
+  } catch {
+    return {}
+  }
+}
+
+export function addProfileTombstone(id: string, deletedAt = Date.now()): void {
+  try {
+    const data = loadProfileTombstones()
+    data[id] = deletedAt
+    localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(data))
+  } catch {
+    /* ignore quota */
+  }
+}
+
+export function removeProfileTombstone(id: string): void {
+  try {
+    const data = loadProfileTombstones()
+    if (!(id in data)) return
+    delete data[id]
+    localStorage.setItem(TOMBSTONE_KEY, JSON.stringify(data))
+  } catch {
+    /* ignore */
+  }
+}
 
 function migrateLegacyStorageKeys(): void {
   const copyIfMissing = (from: string, to: string) => {
@@ -119,6 +169,8 @@ export function saveProfileRecord(
   lastMessageAt?: number,
 ): void {
   if (!profile.id) throw new Error('profile.id required')
+  // 같은 ID를 다시 저장하면(백업 복원 등) 삭제 기록을 지워 부활시킨다
+  removeProfileTombstone(profile.id)
   localStorage.setItem(profileKey(profile.id), JSON.stringify(profile))
 
   const summaries = loadProfileSummaries()
@@ -163,13 +215,21 @@ export function updateProfilePreview(id: string, preview: string, lastMessageAt:
   saveProfileSummaries(summaries)
 }
 
-export async function deleteProfileRecord(id: string): Promise<void> {
+/** 이 기기에서만 삭제 — tombstone·클라우드는 건드리지 않는다 (동기화 병합용) */
+export async function deleteProfileLocally(id: string): Promise<void> {
   localStorage.removeItem(profileKey(id))
   localStorage.removeItem(chatRevisionKey(id))
   saveProfileSummaries(loadProfileSummaries().filter((s) => s.id !== id))
   chatLoadCache.delete(id)
   await deleteChatFromDb(id)
-  if (isCloudSyncAvailable()) void deleteProfileFromCloud(id).catch(() => {})
+}
+
+export async function deleteProfileRecord(id: string): Promise<void> {
+  const deletedAt = Date.now()
+  // 클라우드 기록이 실패해도(오프라인 등) 다음 동기화에서 재시도할 수 있게 먼저 남긴다
+  addProfileTombstone(id, deletedAt)
+  await deleteProfileLocally(id)
+  if (isCloudSyncAvailable()) void tombstoneProfileInCloud(id, deletedAt).catch(() => {})
 }
 
 /** @deprecated — loadProfileById 사용 */
@@ -343,7 +403,7 @@ export async function saveChatAsync(
     const last = messages[messages.length - 1]
     updateProfilePreview(profileId, last.content, last.timestamp)
   } else {
-    touchProfilePreviewOnly(profileId, '자문자답을 시작해보세요')
+    touchProfilePreviewOnly(profileId, '미래의 나에게 먼저 말을 걸어보세요')
   }
   if (options?.pushCloud !== false && isCloudSyncAvailable()) {
     await pushChatToCloud(profileId, messages, revision).catch(() => {})

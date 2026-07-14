@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react'
 import type { SelfProfile } from './types/self'
 import { ChatOnboarding } from './components/onboarding/ChatOnboarding'
 import { ChatScreen } from './components/chat/ChatScreen'
@@ -7,6 +7,7 @@ import { AuthScreen } from './components/auth/AuthScreen'
 import { APP_NAME } from './lib/brand'
 import { FutureMeLogo } from './components/brand/FutureMeLogo'
 import { useAuth } from './contexts/AuthContext'
+import { subscribeCloudPushStatus, isCloudPushFailing } from './lib/syncStatus'
 import {
   ensureMigrated,
   loadProfileSummaries,
@@ -28,6 +29,7 @@ type Screen = 'list' | 'onboarding' | 'chat'
 
 export default function App() {
   const { configured, loading: authLoading, syncing, session } = useAuth()
+  const cloudPushFailing = useSyncExternalStore(subscribeCloudPushStatus, isCloudPushFailing)
   const [screen, setScreen] = useState<Screen>('list')
   const [summaries, setSummaries] = useState<ProfileSummary[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
@@ -154,6 +156,14 @@ export default function App() {
           role="status"
         >
           데이터 동기화 중…
+        </div>
+      )}
+      {configured && session && !syncing && cloudPushFailing && (
+        <div
+          className="fixed top-0 inset-x-0 z-50 py-1.5 text-center text-[11px] text-status-warn bg-status-warn/10 border-b border-status-warn/25 backdrop-blur-sm"
+          role="status"
+        >
+          클라우드 저장 실패 — 지금은 이 기기에만 저장되고 있어요. 다음 저장·동기화 때 다시 시도해요.
         </div>
       )}
       <div className="relative h-full">

@@ -1,465 +1,244 @@
-# 아TalkBack (톡백)
+# Future Me
 
-> **대상:** 프로젝트를 처음 보는 사람  
-> **목적:** “무엇을 만들었는지”, “질문은 왜 이렇게 짰는지”, “AI는 어떻게 ‘나’처럼 말하는지”를 한 번에 이해하기  
-> **최종 업데이트:** 2026-07-06  
-> **배포 URL:** [https://talkback-beta.vercel.app](https://talkback-beta.vercel.app)  
-> **소스:** [https://github.com/jongyoon0130/TalkBack](https://github.com/jongyoon0130/TalkBack)
+> **대상:** 프로젝트를 처음 보는 사람
+> **목적:** "무엇을 만들었는지", "질문은 왜 이렇게 짰는지", "AI는 어떻게 '미래의 나'처럼 말하는지"를 한 번에 이해하기
+> **최종 업데이트:** 2026-07-14
+> **배포 URL:** [https://futureme-beta.vercel.app](https://futureme-beta.vercel.app)
+> **소스:** [https://github.com/jongyoon0130/FutureMe](https://github.com/jongyoon0130/FutureMe)
 
 ---
 
 ## 1. 한 줄 요약
 
-**TalkBack(톡백)** 은 사용자가 온보딩에서 자신에 대한 정보를 입력하면, 그 데이터를 바탕으로 **Gemini API**가 “또 다른 나”처럼 말하는 **자문자답 채팅 웹앱**이다.
+**Future Me**는 온보딩에서 "지금의 나"와 "5년 뒤 되고 싶은 나"를 입력하면, **Gemini API**가 그 **미래의 나 페르소나**가 되어 카톡처럼 대화해주는 웹앱이다.
 
-- 서버·DB 없음 → **브라우저(localStorage + IndexedDB)** 에만 저장
-- API 키도 **각 사용자가 직접 입력** (코드에 키를 넣지 않음)
-- 카카오톡처럼 **프로필(채팅방) 여러 개** 가능
+- 사람의 의지는 날마다 흔들린다 → **이미 그 길을 지나온 5년 뒤의 나**가 북돋아준다
+- 예언·점쟁이가 아니라, "그때는 나도 그랬는데, 지나와 보니 —" 톤의 **경험자**
+- 프로필(채팅방) 여러 개, Google 로그인 시 **클라우드 동기화**, 로그인 없이도 로컬 전용으로 동작
+
+> 이 프로젝트는 자문자답 앱 **TalkBack(톡백)** 을 포크해 방향을 바꾼 것이다. 코드 곳곳의
+> `talkback-*`/`aime-*` 상수는 구버전 데이터 마이그레이션용이니 지우면 안 된다.
 
 ---
 
 ## 2. 왜 이렇게 만들었는가 (설계 의도)
 
+| 목표 | 구현 방식 |
+| --- | --- |
+| 흔들리는 의지를 붙잡아주는 존재 | AI가 "5년 뒤 목표에 도달한 나"로서 담담하게 말함 (`buildSystemPrompt`) |
+| 미래가 생생해야 힘이 됨 | 온보딩에서 평범한 하루(typicalDay), 도달 경로(throughline)까지 구체적으로 수집 |
+| 말투가 진짜 나 같아야 함 | 말투 샘플 수집 + 자동 분석(stylometry), 채팅할수록 학습 |
+| 자기이해 → 용기 → 실행 | 고민 저장, "작은 행동" 제안·격려(courage 모드), 미래의 나 메모 |
+| 긴 대화도 맥락 유지 | 최근 16턴 원문 + 이전 대화는 AI 요약으로 압축 |
+| 데이터 신뢰 | 삭제 기록(tombstone)으로 "지운 프로필이 되살아나지 않게" 보장, 동기화 실패 시 배너 표시 |
 
-| 목표                      | 구현 방식                                              |
-| ----------------------- | -------------------------------------------------- |
-| 부담 없이 쓰는 일상 도구          | 카톡형 UI, 가벼운 색·폰트, 채팅방 목록                           |
-| “AI 챗봇”이 아니라 **나와의 대화** | 프롬프트에서 1인칭 자기 대화 구조 강조, UI에서 “복제 AI” 문구 최소화        |
-| 말투가 진짜 나 같아야 함          | 온보딩에서 **친구에게 톡 보내듯** 쓰라고 안내 + 말투 자동 분석(stylometry) |
-| 성격·가치관까지 반영             | McAdams 3층 + 언어층 모델로 프로필 데이터 구조화                   |
-| 긴 대화도 맥락 유지             | 최근 24턴은 원문, 그 이전은 **AI 요약**으로 압축                   |
-| 개인정보·비용                 | 로컬 저장, API 키 사용자 보유, 백업 JSON 내보내기/가져오기             |
-
+**로드맵 (차별점):** 5년 뒤의 나와 단기 목표를 입력받은 뒤, 투두메이트처럼 **일정·작은 실행을 보여주고 채워가며** 사용자가 미래의 나에게 가까워지게 돕는 기능. (계획을 대신 짜주는 방향은 의도적으로 배제 — 계획은 매일 어긋나고, 어긋난 계획은 오히려 의지를 꺾는다.)
 
 ---
-
-
 
 ## 3. 사용자 관점 — 앱이 어떻게 흐르는가
 
 ```mermaid
 flowchart TD
-    A[앱 실행] --> B{프로필 있음?}
-    B -->|없음| C[채팅방 목록]
-    B -->|있음| C
+    A[앱 실행] --> B{Supabase 설정?}
+    B -->|없음| C[프로필 목록 — 로컬 전용]
+    B -->|있음| L[Google 로그인] --> S[클라우드 동기화] --> C
     C --> D[+ 새 프로필]
     C --> E[기존 프로필 탭]
-    D --> F[온보딩: 질문 20단계]
+    D --> F[온보딩 약 38단계]
     F --> G[SelfProfile 생성]
     G --> H[채팅 화면]
     E --> H
     H --> I[사용자가 먼저 말함]
-    I --> J[Gemini API 응답]
+    I --> J[Gemini — 미래의 나 응답]
     J --> H
-    H --> K[설정: API 키 / 백업]
-    H --> L[헤더 탭: 내 프로필 보기]
+    H --> K[설정: API 키 / 백업 / 삭제]
     H --> M[← 목록]
     M --> C
 ```
-
-
 
 **중요한 UX 결정**
 
 - 채팅 시작 시 **자동 인사 없음** → 사용자가 먼저 말해야 함 (몰입감)
 - 온보딩 중간 저장 → 브라우저 닫아도 이어서 가능
-- 프로필 삭제는 **해당 채팅방만** 삭제 (다른 프로필 유지)
+- 프로필 삭제는 해당 채팅방만 삭제되고, **삭제 기록이 남아** 다른 기기와의 동기화에서도 되살아나지 않음
 
 ---
 
+## 4. 온보딩 — "지금의 나"와 "미래의 나"를 수집
 
+질문 흐름은 [src/lib/onboardingConfig.ts](src/lib/onboardingConfig.ts)의 `ONBOARDING_STEPS`(약 38단계)로 정의되고, UI는 [ChatOnboarding.tsx](src/components/onboarding/ChatOnboarding.tsx)가 그린다.
 
-## 4. “나”를 표현하는 데이터 구조 (4층 모델)
+**1부 — 지금의 나 (15단계):** 이름 → 나이 → 역할·상황 → 하루하루 → 신경 쓰이는 영역(칩) → **말투 학습 샘플** → 절대 못 놓는 것 → "잘 산다"의 정의 → 가치관 딜레마(선택+이유) → 힘들었던 순간 → 두려움 → 진짜 원하는 것 → 1년 뒤 성장상 → 대화 톤 선택
 
-프로필(`SelfProfile`)은 심리학의 **McAdams 정체성 3층** + **말투(언어) 층**으로 설계했다.
+**2부 — 5년 뒤의 나 (23단계):** 정체성 한 문장 → 잘 풀렸으면 하는 영역 → **평범한 하루(생생함)** → **도달 경로(throughline, "future memory")** → 직업/루틴/돈/관계/건강/사는 곳 → 자랑스러운 성취 → 넘어선 어려움 → 배운 것 → 피하고 싶은 미래(칩) → 될 뻔했던 길 → 별거 아니었던 걱정 → 변한 성격(칩) → **미래의 나 말투 샘플** → 편지(adviceLine) → 자아 연속성(1–7) → 이번 주 작은 행동 → 자주 물을 주제
 
-```mermaid
-flowchart TB
-    subgraph L0["L0 앵커 — 기본 정보"]
-        name[이름]
-        age[나이]
-        life[요즘 상황]
-        mbti[MBTI]
-    end
-    subgraph L1["L1 기질 — Big Five"]
-        bf[10문항 슬라이더 → 5요인 점수]
-    end
-    subgraph L2["L2 가치·판단"]
-        cp[인생 1순위]
-        sd[잘 산다의 정의]
-        ad[존경하는 사람]
-        dl[딜레마 4개 선택+이유]
-    end
-    subgraph L3["L3 서사·기억"]
-        tp[전환점]
-        pm[대견했던 순간]
-        sm[힘들었던 순간]
-        cm[남을 위로한 방식]
-        ct[나를 위로하는 말]
-    end
-    subgraph L4["L4 언어 — 말투"]
-        ss[레지스터별 원문 샘플]
-        sr[자동 추출 규칙서]
-    end
-    subgraph L5["대화 중 축적 (잠정)"]
-        ins[insights 관찰]
-        sum[conversationSummary]
-    end
-    L0 --> L1 --> L2 --> L3 --> L4
-    L4 --> L5
+설계 원리: 미래를 **한 줄 목표**가 아니라 **하루의 장면과 도달 서사**로 쓰게 하면 페르소나가 살아난다. 질문을 바꾸려면 `ONBOARDING_STEPS` 배열만 수정하면 된다.
+
+---
+
+## 5. 데이터 모델 ([src/types/self.ts](src/types/self.ts))
+
+```
+SelfProfile ─── 프로필(채팅방) 하나의 전체 데이터
+├─ 지금의 나: name, age, currentRole, lifeContext, concernDomains,
+│             fear/desire/avoidance/growthDirection, corePriority, successDef …
+├─ future: FutureSelfProfile ─── 5년 뒤의 나
+│   identityLine, typicalDay, throughline, career, income, relationship,
+│   health, achievement, obstacleOvercome, lesson, fearedSelves,
+│   futureVoiceSample, adviceLine(+adviceTone), weeklyAction …
+├─ 말투: styleSamples(원문) + styleRules(자동 분석 규칙서)
+├─ 대화 축적: insights(잠정 관찰), conversationSummary(오래된 대화 요약)
+└─ 성장 액션: savedDilemmas(고민), smallActions(작은 행동), futureSelfNotes(메모)
 ```
 
-
-
-**레지스터(Register)** — 같은 사람도 상황에 따라 말투가 다르다는 전제:
-
-
-| 레지스터       | 의미    | 온보딩에서 쓰는 예시 필드    |
-| ---------- | ----- | ----------------- |
-| casual     | 일상    | 요즘 뭐 하면서 지내       |
-| reflective | 성찰·고민 | 인생 1순위, 잘 산다의 정의  |
-| venting    | 토로    | 힘들었던 순간           |
-| joyful     | 기쁨    | 대견했던 순간           |
-| comforting | 위로    | 위로해준 기억, 듣고 싶은 위로 |
-
+구버전(필드 구조가 다른) 프로필은 `normalizeFutureSelf()`가 자동 변환한다.
 
 ---
 
+## 6. AI — "미래의 나"는 어떻게 만들어지는가
 
+핵심 파일: [src/lib/selfEngine.ts](src/lib/selfEngine.ts)
 
-## 5. 온보딩 질문 — 순서와 의도
-
-온보딩은 `ChatOnboarding.tsx`의 `STEPS` 배열로 정의된다.  
-**설계 원칙:** 가벼운 사실 → 성격 → 가치관 → 깊은 서사 → 위로 (초반 워밍업 후 감정적으로 깊어짐)
-
-### 5-1. 전체 질문 순서표
-
-
-| #     | 유형       | 질문 요지                       | 저장 필드           | 레지스터       |
-| ----- | -------- | --------------------------- | --------------- | ---------- |
-| 1     | 이름       | 뭐라고 부를까? (친구한테 톡하듯 써달라는 안내) | `name`          | —          |
-| 2     | 나이       | 몇 살?                        | `age`           | —          |
-| 3     | MBTI     | 알면 선택, 모르면 스킵               | `mbti`          | —          |
-| 4     | 서술       | 요즘 뭐 하면서 지내?                | `lifeContext`   | casual     |
-| 5     | Big Five | 10문항 슬라이더 (1~7)             | `bigFive`       | —          |
-| 6     | 서술       | 인생에서 절대 못 놓는 1순위 + 이유       | `corePriority`  | reflective |
-| 7–8   | 딜레마 1    | 안정 vs 하고 싶은 길 → 왜?          | `dilemmas[0]`   | reflective |
-| 9–10  | 딜레마 2    | 친구가 틀렸을 때 → 왜?              | `dilemmas[1]`   | reflective |
-| 11–12 | 딜레마 3    | 갈등 시 반응 → 왜?                | `dilemmas[2]`   | reflective |
-| 13–14 | 딜레마 4    | 목돈 생기면 → 왜?                 | `dilemmas[3]`   | reflective |
-| 15    | 서술       | “잘 산다”는 어떤 삶?               | `successDef`    | reflective |
-| 16    | 서술       | 닮고 싶은/존경하는 사람 (선택)          | `admire`        | reflective |
-| 17    | 서술       | 나를 만든 결정적 순간                | `turningPoint`  | reflective |
-| 18    | 서술       | 스스로 대견했던 때                  | `proudMoment`   | joyful     |
-| 19    | 서술       | 최근 제일 힘들었던 것                | `stressMoment`  | venting    |
-| 20    | 서술       | 힘든 사람에게 뭐라고 해줬는지 (선택)       | `comfortMemory` | comforting |
-| 21    | 서술       | 힘들 때 듣고 싶은 위로               | `comfortTarget` | comforting |
-
-
-
-
-### 5-2. Big Five 10문항 (TIPI 스타일)
-
-각 요인당 2문항, 역채점 포함 → 5요인 점수 산출 (`scoreBigFive`)
-
-
-| 요인  | 문항 예                           |
-| --- | ------------------------------ |
-| 개방성 | 새로운 아이디어에 끌린다 / 익숙한 방식이 편하다(역) |
-| 성실성 | 계획하고 끝까지 지킨다 / 즉흥적(역)          |
-| 외향성 | 사람과 어울리면 에너지 / 혼자가 회복(역)       |
-| 우호성 | 상대 입장 공감 / 내 의견 밀어붙임(역)        |
-| 신경성 | 걱정·불안 자주 / 감정 안 흔들림(역)         |
-
-
-
-
-### 5-3. 딜레마 4가지
-
-`types/self.ts`의 `DILEMMA_SPECS`:
-
-1. **안정 vs 하고 싶은 길**
-2. **친구가 틀렸을 때 — 지적 vs 넘어감**
-3. **갈등 시 — 감정 먼저 / 논리 먼저 / 피하고 시간**
-4. **목돈 — 저축 / 경험 / 나눔**
-
-→ 선택 + 이유를 함께 받아 **가치관·판단 패턴**을 L2에 저장한다.
-
-### 5-4. 온보딩 완료 후 처리
-
-1. 서술형 답변 → `styleSamples` (레지스터별 원문)
-2. `extractStyleRules()` → 반말/존댓말, 문장 길이, ㅋㅋ/이모지, 자주 쓰는 어미·필러 등 **말투 규칙서** 생성
-3. `SelfProfile` 저장 → 채팅 화면으로 이동
-
----
-
-
-
-## 6. 기술 구조 — 코드는 어디에 있는가
-
-```mermaid
-flowchart LR
-    subgraph UI["화면 (React)"]
-        App[App.tsx]
-        List[ProfileListScreen]
-        Onboard[ChatOnboarding]
-        Chat[ChatScreen]
-        Sheet[ProfileSheet]
-    end
-    subgraph Logic["핵심 로직"]
-        Engine[selfEngine.ts]
-        Store[storage.ts]
-        DB[chatDb.ts]
-    end
-    subgraph External["외부"]
-        Gemini[Gemini API]
-    end
-    App --> List & Onboard & Chat
-    Chat --> Engine & Store & DB
-    Onboard --> Engine & Store
-    Engine --> Gemini
-    Store --> LS[(localStorage)]
-    DB --> IDB[(IndexedDB)]
-```
-
-
-
-
-
-### 6-1. 주요 파일 역할
-
-
-| 파일                                             | 역할                                   |
-| ---------------------------------------------- | ------------------------------------ |
-| `src/App.tsx`                                  | 화면 전환: 목록 ↔ 온보딩 ↔ 채팅                 |
-| `src/types/self.ts`                            | 데이터 모델, Big Five·딜레마 상수              |
-| `src/lib/selfEngine.ts`                        | 점수 계산, 말투 분석, **프롬프트 조립**, Gemini 호출 |
-| `src/lib/storage.ts`                           | 프로필 CRUD, API 키, 백업 JSON             |
-| `src/lib/chatDb.ts`                            | 프로필별 채팅 전체 기록 (IndexedDB)            |
-| `src/lib/brand.ts`                             | 앱명 `톡백`, 태그라인                        |
-| `src/components/onboarding/ChatOnboarding.tsx` | 온보딩 질문 흐름                            |
-| `src/components/chat/ChatScreen.tsx`           | 채팅 UI, API 호출, 인사이트·요약 갱신            |
-
-
-
-
-### 6-2. 데이터 저장 위치
-
-
-| 데이터             | 저장소                  | 키/구조                                           |
-| --------------- | -------------------- | ---------------------------------------------- |
-| 프로필 목록 인덱스      | localStorage         | `talkback-profiles-index`                      |
-| 프로필 본문          | localStorage         | `talkback-profile-{id}`                        |
-| Gemini API 키·모델 | localStorage         | `talkback-gemini-key`, `talkback-gemini-model` |
-| 채팅 전체 기록        | IndexedDB `talkback` | store `chat`, key = `profileId`                |
-| 온보딩 중간 진행       | localStorage         | `talkback-onboarding-progress`                 |
-
-
-> 구버전 `aime-*` localStorage 키도 **자동 마이그레이션** 지원.
-
----
-
-
-
-## 7. AI / 프롬프트 — “또 다른 나”는 어떻게 만들어지는가
-
-핵심 파일: `src/lib/selfEngine.ts`
-
-### 7-1. 한 턴의 처리 흐름
+### 6-1. 한 턴의 처리 흐름
 
 ```mermaid
 sequenceDiagram
     participant U as 사용자
     participant C as ChatScreen
+    participant P as chatReplyPlan
     participant E as selfEngine
     participant G as Gemini API
 
     U->>C: 메시지 입력
-    C->>E: detectRegister(말투/상황 감지)
-    C->>E: accumulateInsights(로컬 키워드)
-    Note over C,E: 8턴마다 analyzeInsightsWithAI
+    C->>P: buildReplyPlan (어느 메시지에 답할지, 에러 말풍선 제외)
     C->>E: fetchAIResponse()
-    E->>E: buildSystemPrompt()
-    E->>E: buildFewShotTurns(말투 예시)
-    E->>G: systemInstruction + contents
-    G-->>E: 응답 텍스트
-    E-->>C: "또 다른 나" 메시지
-    Note over C,E: 36턴+ 시 updateConversationSummary
-    C->>C: IndexedDB 저장
+    E->>E: analyzeMessage (감정·주제·강도·모호함)
+    E->>E: buildSystemPrompt (미래의 나 정체성 + 프로필 + 말투 규칙)
+    E->>G: systemInstruction + 최근 16턴
+    G-->>E: 응답
+    E->>E: enforceReplyLimits (3문장 제한, 상담사 톤 제거)
+    E-->>C: 미래의 나 메시지
+    C->>C: IndexedDB 저장 + 클라우드 푸시 + 말투/인사이트 학습
 ```
 
+### 6-2. 시스템 프롬프트 (`buildSystemPrompt`)
 
+- **정체성:** "너는 ○○의 5년 뒤(N세) 미래의 나다. AI·상담사·점쟁이가 아니다." 예언 금지, "지나와 보니 —" 톤 강제
+- **동적 블록:** 이번 말 분석 결과, 미래 프로필 전체(`describeFutureSelf`), 말투 규칙, 대화 요약, 인사이트
+- **답변 모드** (`ReplyMode`): `future`(기본 — 미래의 나 관점) · `courage`(작은 행동 밀어주기) · `reflect`(순수 반영)
+- **길이·금지:** 한 턴 최대 3문장, 번호·불릿 금지, user 말 되풀이 금지
 
+### 6-3. 메모리 2단 구조
 
+| 구간 | 처리 |
+| --- | --- |
+| 최근 16메시지 (lite 모드 10) | API에 원문 전송 |
+| 36턴 초과분 | `updateConversationSummary`가 16턴마다 AI 요약으로 압축 |
+| 24턴마다 | `analyzeInsightsWithAI`가 가치관·상황을 JSON으로 추론해 축적 |
 
-### 7-2. 시스템 프롬프트 구성 (`buildSystemPrompt`)
-
-프롬프트는 **고정 규칙** + **프로필에서 끌어온 동적 블록**으로 조립된다.
-
-
-| 섹션          | 내용                       | 출처                              |
-| ----------- | ------------------------ | ------------------------------- |
-| 대화 구조       | “같은 나와의 1인칭 대화”, 너/당신 금지 | 고정                              |
-| 지금 상황       | venting/joyful/… 가이드     | `detectRegister()`              |
-| 기본 정보       | Big Five 요약, 나이, 요즘 상황   | L0, L1                          |
-| 중요하게 여기는 것  | 1순위, 잘 산다, 존경            | L2                              |
-| 선택으로 드러난 판단 | 딜레마 선택+이유                | L2                              |
-| 이 사람을 이해할 때 | Big Five → 자연어 서술        | `describePersonUnderstanding()` |
-| 배경 기억       | 전환점·자부심 등 (억지로 꺼내지 말 것)  | L3                              |
-| 대화 요약       | 오래된 턴 압축본                | `conversationSummary`           |
-| 대화에서 알게 된 것 | insights (잠정)            | L5                              |
-| 말투 규칙       | 반말/존댓말, 어미, 필러 등         | L4 `styleRules`                 |
-| 길이·금지사항     | 2~4문장, 상담사 톤 금지 등        | 고정                              |
-
-
-**핵심 철학 (프롬프트에 명시):**
-
-- user 턴 = **내 속마음** (`[나의 속마음]` 접두어로 API에 전달)
-- model 턴 = **같은 나**가 다른 각도에서 되비침
-- ❌ “그런 배짱 부러워” (남처럼 칭찬)
-- ✅ “그런 배짱? 있는 것도 다행이다” (자기 안에서 인정)
-
-
-
-### 7-3. Few-shot 말투 모방 (`buildFewShotTurns`)
-
-온보딩에서 모은 **실제 사용자 원문**을 대화 턴 형식으로 API `contents` 앞에 붙인다.
-
-```
-user:  [나의 속마음] 하... 나 요즘 좀 힘들다
-model: (온보딩에서 쓴 stressMoment 원문)
-```
-
-→ Gemini가 문체·어미·리듬을 **모방**하도록 유도.
-
-### 7-4. 말투 자동 분석 (`extractStyleRules`)
-
-온보딩 + 이후 채팅에서 쌓인 `styleSamples` 텍스트를 분석:
-
-- 존댓말 비율 → 반말/존댓말
-- 평균 문장 길이
-- ㅋㅋ/ㅠㅠ, 이모지, 느낌표, 말줄임 빈도
-- 자주 쓰는 종결어미·필러 (예: 거든, 잖아, 그냥, 뭔가)
-
-
-
-### 7-5. 보조 AI 호출 (같은 API, 다른 system prompt)
-
-
-| 함수                          | 목적             | 트리거             |
-| --------------------------- | -------------- | --------------- |
-| `fetchAIResponse`           | 채팅 응답          | 매 사용자 메시지       |
-| `updateConversationSummary` | 오래된 대화 요약      | 36턴+ & 16턴마다 갱신 |
-| `analyzeInsightsWithAI`     | 가치관·상황 추론 JSON | 8턴마다            |
-
-
-**메모리 2단 구조:**
-
-- **최근 24메시지** → API에 원문 전송
-- **그 이전** → `conversationSummary`에 AI 요약 (최대 ~900자)
-
-
-
-### 7-6. API 키 없을 때
-
-`generateLocalResponse()` — 규칙 기반 짧은 fallback (Gemini 미사용)
+API 키가 없으면 `generateLocalResponse()`가 규칙 기반 짧은 답으로 대체한다.
 
 ---
 
+## 7. 저장·동기화 구조
 
+| 데이터 | 저장소 | 키/구조 |
+| --- | --- | --- |
+| 프로필 목록 인덱스 | localStorage | `futureme-profiles-index` |
+| 프로필 본문 | localStorage | `futureme-profile-{id}` |
+| **삭제 기록 (tombstone)** | localStorage | `futureme-profile-tombstones` (180일 후 자동 정리) |
+| Gemini API 키·모델 | localStorage | `futureme-gemini-key`, `futureme-gemini-model` — **클라우드에 올라가지 않음** |
+| 채팅 전체 기록 | IndexedDB `futureme` | store `chat`, key = `profileId` |
+| 온보딩 중간 진행 | localStorage | `futureme-onboarding-v4` |
+| 클라우드 (로그인 시) | Supabase | `futureme_profiles`, `futureme_chats`, `futureme_settings` (RLS로 본인만 접근) |
 
-## 8. 채팅 화면 부가 기능
+### 동기화 규칙 ([src/lib/syncOrchestrator.ts](src/lib/syncOrchestrator.ts))
 
+1. 로그인하면 로컬 vs 클라우드를 비교: 한쪽만 있으면 그쪽을 복사, 둘 다 있으면 **updated_at이 최신인 쪽이 승리** (프로필 단위)
+2. **삭제는 tombstone으로 전파**: 프로필을 지우면 클라우드 행을 없애는 대신 `{ __deleted: true, deletedAt }` 표식으로 바꾼다. 병합 때 "삭제 시각 vs 수정 시각, 늦은 쪽이 이긴다"(`deletionWins`) — 삭제 후 다른 기기에서 대화를 이어갔다면 부활, 아니면 모든 기기에서 삭제 유지
+3. 클라우드 저장이 실패하면 화면 상단에 **"클라우드 저장 실패" 배너**가 뜨고, 다음 저장·동기화 때 자동 재시도된다 ([src/lib/syncStatus.ts](src/lib/syncStatus.ts))
 
-| 기능       | 설명                                 |
-| -------- | ---------------------------------- |
-| API 키 설정 | `verifyApiKey()`로 저장 전 검증          |
-| 모델 선택    | 기본 `gemini-2.5-flash`              |
-| 백업 내보내기  | `talkback-backup-{이름}-{날짜}.json`   |
-| 백업 가져오기  | 프로필+메시지 덮어쓰기                       |
-| 프로필 시트   | 온보딩에 입력한 값 조회 (헤더 탭)               |
-| 프로필 삭제   | 해당 ID의 localStorage + IndexedDB 삭제 |
-
+주의: 채팅은 프로필 단위로 통째로 비교되므로, 두 기기에서 **동시에** 같은 프로필과 대화하면 늦게 저장한 쪽만 남는다. (메시지 단위 병합은 미구현 — §11)
 
 ---
 
+## 8. 기술 스택 & 실행
 
-
-## 9. 기술 스택 & 배포
-
-
-| 항목      | 선택                                     |
-| ------- | -------------------------------------- |
-| 프레임워크   | React 19 + TypeScript                  |
-| 빌드      | Vite 8                                 |
-| 스타일     | Tailwind CSS 4                         |
-| 패키지 매니저 | Bun                                    |
-| AI      | Google Gemini API (REST, 브라우저에서 직접 호출) |
-| 호스팅     | Vercel (`dist` 정적 배포)                  |
-
-
-**로컬 개발**
+| 항목 | 선택 |
+| --- | --- |
+| 프레임워크 | React 19 + TypeScript |
+| 빌드 | Vite 8 |
+| 스타일 | Tailwind CSS 4 |
+| 패키지 매니저·테스트 | Bun (`bun test` 내장 러너) |
+| AI | Google Gemini API (REST, 브라우저에서 직접 호출, 기본 `gemini-3-flash-preview`) |
+| 로그인·DB | Supabase (Google OAuth + Postgres, 선택 사항) |
+| 호스팅 | Vercel (`dist` 정적 배포) |
 
 ```bash
+cp .env.example .env   # Supabase 쓰려면 값 입력, 로컬 전용이면 그대로 둬도 됨
 bun install
-bun run dev    # http://localhost:5173
+bun run dev            # http://localhost:5173
+bun test               # 테스트 (tests/)
+bun run build          # 타입검사 + dist 생성
+bun run lint           # Oxlint
 ```
 
-**빌드**
-
-```bash
-bun run build
-bun run preview   # dist 미리보기
-bun run lint      # Oxlint
-```
-
-**주의:** 로컬과 웹(Vercel) URL의 데이터는 **서로 공유되지 않음**. 옮기려면 백업 JSON 사용.
+- Supabase·Google 로그인 설정: [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md)
+- AI 답변을 받으려면 앱 안 ⚙️ 설정에서 **본인 Gemini API 키**를 입력해야 한다 (키는 기기에만 저장)
+- 로컬(localhost)과 배포 URL의 로컬 데이터는 분리된다 — 옮기려면 Google 로그인 동기화 또는 백업 JSON
 
 ---
 
+## 9. 주요 파일 지도
 
+| 파일 | 역할 |
+| --- | --- |
+| [src/App.tsx](src/App.tsx) | 화면 전환: 목록 ↔ 온보딩 ↔ 채팅, 동기화 배너 |
+| [src/types/self.ts](src/types/self.ts) | 데이터 모델 (SelfProfile, FutureSelfProfile) ★먼저 읽기 |
+| [src/lib/onboardingConfig.ts](src/lib/onboardingConfig.ts) | 온보딩 질문 정의 (질문 수정은 여기) |
+| [src/lib/selfEngine.ts](src/lib/selfEngine.ts) | 프롬프트 조립, Gemini 호출, 말투 분석, 답변 후처리 ★핵심 |
+| [src/lib/storage.ts](src/lib/storage.ts) | localStorage CRUD, tombstone, 백업, 구버전 마이그레이션 |
+| [src/lib/chatDb.ts](src/lib/chatDb.ts) | IndexedDB 채팅 기록 |
+| [src/lib/cloudSync.ts](src/lib/cloudSync.ts) | Supabase 읽기/쓰기 + tombstone 행 |
+| [src/lib/syncOrchestrator.ts](src/lib/syncOrchestrator.ts) | 로컬↔클라우드 병합 규칙 |
+| [src/lib/syncStatus.ts](src/lib/syncStatus.ts) | 클라우드 저장 실패 상태 (UI 배너용) |
+| [src/lib/chatReplyPlan.ts](src/lib/chatReplyPlan.ts) | 어떤 메시지에 답할지·재시도 계획 |
+| [src/lib/growthStore.ts](src/lib/growthStore.ts) | 고민/작은 행동/메모 (순수 함수) |
+| [src/components/chat/ChatScreen.tsx](src/components/chat/ChatScreen.tsx) | 채팅 UI, API 호출, 설정, 백업 |
+| [src/components/onboarding/ChatOnboarding.tsx](src/components/onboarding/ChatOnboarding.tsx) | 온보딩 대화 UI |
+| [tests/](tests/) | bun test — 응답 계획·tombstone 병합 규칙 |
+| [supabase/schema.sql](supabase/schema.sql) | DB 테이블 + RLS 정책 |
+
+**읽는 순서 추천 (신규 개발자):** §3 흐름 → `types/self.ts` → `onboardingConfig.ts` → `selfEngine.ts`의 `buildSystemPrompt` → `ChatScreen.tsx` → `storage.ts`+`syncOrchestrator.ts`
+
+---
 
 ## 10. 용어 정리
 
-
-| 용어            | 의미                         |
-| ------------- | -------------------------- |
-| SelfProfile   | 한 “채팅방(나)”의 전체 프로필 데이터     |
-| 또 다른 나 / self | AI가 말하는 쪽 (`role: 'self'`) |
-| 레지스터          | 말하는 상황(일상/토로/위로 등)         |
-| insight       | 대화 중 조심스럽게 쌓는 잠정 관찰        |
-| stylometry    | 텍스트에서 말투 통계 추출             |
-| few-shot      | API 앞에 붙이는 말투 예시 대화        |
-
-
----
-
-
-
-## 11. 읽는 순서 추천 (신규 개발자)
-
-1. **§3** — 사용자 흐름
-2. `src/types/self.ts` — 데이터가 뭔지
-3. `ChatOnboarding.tsx`의 `STEPS` — 어떤 질문을 하는지
-4. `selfEngine.ts`의 `buildSystemPrompt` — AI가 어떻게 “나”가 되는지
-5. `ChatScreen.tsx` — 실제 API 호출·저장 타이밍
-6. `storage.ts` + `chatDb.ts` — 어디에 저장되는지
+| 용어 | 의미 |
+| --- | --- |
+| SelfProfile | 채팅방 하나의 전체 프로필 (지금의 나 + future) |
+| 미래의 나 / self | AI가 말하는 쪽 (`role: 'self'`) |
+| throughline | 지금→5년 뒤에 도달한 경로 서사 ("future memory") |
+| 레지스터 | 말하는 상황 (일상/성찰/토로/기쁨/위로) |
+| stylometry | 텍스트에서 말투 규칙(반말, 어미, ㅋㅋ 빈도 등) 자동 추출 |
+| insight | 대화에서 조심스럽게 쌓는 잠정 관찰 |
+| tombstone | 삭제 기록 — 지운 프로필이 동기화로 되살아나지 않게 하는 표식 |
+| ReplyMode | 답변 관점 (future/courage/reflect) |
 
 ---
 
+## 11. 한계 & 다음 단계
 
-
-## 12. 한계 & 향후 확장 아이디어 (참고)
-
-
-| 현재 한계                | 가능한 개선             |
-| -------------------- | ------------------ |
-| API 키를 사용자가 직접 발급    | 서버 프록시 + 사용량 관리    |
-| 브라우저별 데이터 분리         | 계정·클라우드 동기화        |
-| Gemini만 지원           | 다른 LLM 어댑터         |
-| insights는 휴리스틱+가끔 AI | 정기 fine-tune / RAG |
-
+| 현재 한계 | 방향 |
+| --- | --- |
+| Gemini API 키를 사용자가 직접 발급·입력 | 서버 프록시 + 사용량 관리 (키 노출 위험 제거) |
+| 채팅 병합이 프로필 단위 (동시 편집 시 한쪽 유실) | 메시지 단위 병합 |
+| 실행(작은 행동)이 채팅 안에만 존재 | **일정·단기 목표 뷰 (투두메이트식)** — 핵심 로드맵 |
+| 페르소나 품질이 온보딩 답변 품질에 좌우됨 | 질문 템플릿·예시 개선, 온보딩 후 페르소나 미리보기 |
+| localStorage 용량(~5MB) 한계 | 프로필 본문도 IndexedDB로 이전 |
 
 ---
 
-*코드 변경 시* `STEPS`*,* `buildSystemPrompt`*, 저장 키 이름과 함께 이 README도 갱신하는 것을 권장한다.*
+*코드 변경 시* `ONBOARDING_STEPS`*,* `buildSystemPrompt`*, 저장 키, 동기화 규칙과 함께 이 README도 갱신할 것.*

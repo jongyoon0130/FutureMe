@@ -1,5 +1,6 @@
 import type { ChatMessage, SelfProfile } from '../types/self'
 import { supabase, isSupabaseConfigured } from './supabase'
+import { noteCloudPushFailure, noteCloudPushSuccess } from './syncStatus'
 
 let activeUserId: string | null = null
 
@@ -16,9 +17,27 @@ function requireClient() {
   return { client: supabase, userId: activeUserId }
 }
 
+/**
+ * 클라우드 tombstone(묘비) — 프로필을 지울 때 행을 없애는 대신 이 표식으로 바꿔 둔다.
+ * 행이 아예 사라지면 다른 기기가 "삭제된 것"과 "아직 동기화 안 된 것"을 구분할 수
+ * 없어서, 지운 프로필이 병합 때 되살아나는 버그가 생긴다.
+ */
+export type CloudProfileTombstone = {
+  __deleted: true
+  deletedAt: number
+}
+
+export function isCloudTombstone(data: unknown): data is CloudProfileTombstone {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as CloudProfileTombstone).__deleted === true
+  )
+}
+
 export type RemoteProfileRow = {
   id: string
-  profile_data: SelfProfile
+  profile_data: SelfProfile | CloudProfileTombstone
   preview: string
   updated_at: number
 }
@@ -37,7 +56,7 @@ export async function pushProfileToCloud(
   const ctx = requireClient()
   if (!ctx) return
 
-  await ctx.client.from('futureme_profiles').upsert(
+  const { error } = await ctx.client.from('futureme_profiles').upsert(
     {
       id: profile.id,
       user_id: ctx.userId,
@@ -47,6 +66,11 @@ export async function pushProfileToCloud(
     },
     { onConflict: 'user_id,id' },
   )
+  if (error) {
+    noteCloudPushFailure()
+    throw error
+  }
+  noteCloudPushSuccess()
 }
 
 export async function pushChatToCloud(
@@ -70,26 +94,50 @@ export async function pushChatToCloud(
     },
     { onConflict: 'user_id,profile_id' },
   )
-  if (error) throw error
+  if (error) {
+    noteCloudPushFailure()
+    throw error
+  }
+  noteCloudPushSuccess()
 }
 
-export async function deleteProfileFromCloud(profileId: string): Promise<void> {
+/**
+ * 프로필 삭제를 클라우드에 기록한다.
+ * 채팅 행은 지우고, 프로필 행은 tombstone으로 바꿔 다른 기기에 삭제를 전파한다.
+ */
+export async function tombstoneProfileInCloud(profileId: string, deletedAt: number): Promise<void> {
   const ctx = requireClient()
   if (!ctx) return
 
-  await ctx.client
+  const tombstone: CloudProfileTombstone = { __deleted: true, deletedAt }
+  const { error: chatError } = await ctx.client
     .from('futureme_chats')
     .delete()
     .eq('user_id', ctx.userId)
     .eq('profile_id', profileId)
-  await ctx.client.from('futureme_profiles').delete().eq('user_id', ctx.userId).eq('id', profileId)
+  const { error: profileError } = await ctx.client.from('futureme_profiles').upsert(
+    {
+      id: profileId,
+      user_id: ctx.userId,
+      profile_data: tombstone,
+      preview: '',
+      updated_at: deletedAt,
+    },
+    { onConflict: 'user_id,id' },
+  )
+  const error = chatError ?? profileError
+  if (error) {
+    noteCloudPushFailure()
+    throw error
+  }
+  noteCloudPushSuccess()
 }
 
 export async function pushSettingsToCloud(geminiModel: string | null): Promise<void> {
   const ctx = requireClient()
   if (!ctx) return
 
-  await ctx.client.from('futureme_settings').upsert(
+  const { error } = await ctx.client.from('futureme_settings').upsert(
     {
       user_id: ctx.userId,
       gemini_model: geminiModel,
@@ -97,6 +145,11 @@ export async function pushSettingsToCloud(geminiModel: string | null): Promise<v
     },
     { onConflict: 'user_id' },
   )
+  if (error) {
+    noteCloudPushFailure()
+    throw error
+  }
+  noteCloudPushSuccess()
 }
 
 export async function fetchRemoteProfiles(userId: string): Promise<RemoteProfileRow[]> {

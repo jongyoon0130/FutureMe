@@ -1208,9 +1208,9 @@ function describeFutureSelf(p: SelfProfile): string {
 }
 
 // 답변 관점 모드: Future Me 기본 = future (미래의 나)
-export type TalkBackMode = 'reflect' | 'future' | 'courage'
+export type ReplyMode = 'reflect' | 'future' | 'courage'
 
-const MODE_OVERLAY: Record<TalkBackMode, string> = {
+const MODE_OVERLAY: Record<ReplyMode, string> = {
   reflect: '',
   future:
     `\n## 지금은 "${FUTURE_YEARS_AHEAD}년 뒤 미래의 나" 관점\n- 너는 user가 온보딩에서 만든 **${FUTURE_YEARS_AHEAD}년 뒤의 나**다. 예언·점쟁이 금지.\n- Future memory(throughline)·typicalDay·futureVoiceSample을 **말투·기억의 뼈대**로 삼되, 온보딩 문장을 그대로 낭독하지 말 것.\n- 지금의 나보다 담담하고 경험에서 온 말투. ㅋㅋ/ㅠㅠ는 줄이되, user styleSample과의 **연속성**은 유지.\n- "그때의 나한테 해주고 싶은 말" 톤으로, 이미 그 길을 걸어온 사람처럼 말한다.`,
@@ -1225,7 +1225,7 @@ export function buildSystemPrompt(
   userMessage?: string,
   lite = false,
   contextMessages?: ApiDialogueMessage[],
-  mode: TalkBackMode = 'future',
+  mode: ReplyMode = 'future',
 ): string {
   const emptyAnalysis = (reg: Register): MessageAnalysis => ({
     primaryRegister: reg,
@@ -2039,7 +2039,7 @@ function parseRateLimitKind(body: string): RateLimitKind {
 function logGeminiUsage(label: string, model: string, usage?: GeminiUsage): void {
   if (!usage) return
   lastGeminiUsage = { label, model, usage, at: Date.now() }
-  console.info('[TalkBack/Gemini]', label, {
+  console.info('[FutureMe/Gemini]', label, {
     model,
     promptTokens: usage.promptTokenCount,
     outputTokens: usage.candidatesTokenCount,
@@ -2060,7 +2060,7 @@ async function geminiGenerateOnce(
   const timeoutMs = geminiFetchTimeoutMs(label)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
-  console.info('[TalkBack/Gemini] fetch start', { label, model, timeoutMs })
+  console.info('[FutureMe/Gemini] fetch start', { label, model, timeoutMs })
 
   let res: Response
   try {
@@ -2072,7 +2072,7 @@ async function geminiGenerateOnce(
     })
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
-      console.info('[TalkBack/Gemini] fetch timeout', { label, timeoutMs })
+      console.info('[FutureMe/Gemini] fetch timeout', { label, timeoutMs })
       throw new GeminiApiError('HTTP', {
         httpStatus: 408,
         httpDetail: `Gemini fetch timeout after ${timeoutMs}ms`,
@@ -2211,7 +2211,7 @@ export async function fetchAIResponse(
   apiKey: string,
   model: string = DEFAULT_GEMINI_MODEL,
   replyPlan?: ChatReplyPlanInput,
-  mode: TalkBackMode = 'future',
+  mode: ReplyMode = 'future',
 ): Promise<string> {
   const resolvedModel = resolveModel(model)
   const apiMessages = replyPlan
@@ -2227,7 +2227,7 @@ export async function fetchAIResponse(
   const focusInstruction = replyPlan?.focusInstruction ?? ''
   const lite = shouldUseLitePrompt(p, apiMessages.length)
   if (lite) {
-    console.info('[TalkBack/Gemini] lite prompt', {
+    console.info('[FutureMe/Gemini] lite prompt', {
       messages: apiMessages.length,
       summaryChars: p.conversationSummary?.trim().length ?? 0,
     })
@@ -2237,7 +2237,7 @@ export async function fetchAIResponse(
 
   const messageAnalysis = lastUser ? analyzeMessage(lastUser.content, apiMessages) : undefined
   if (messageAnalysis?.inConcretizationFlow || messageAnalysis?.vague) {
-    console.info('[TalkBack/Gemini] concretize turn', {
+    console.info('[FutureMe/Gemini] concretize turn', {
       vague: messageAnalysis.vague,
       inFlow: messageAnalysis.inConcretizationFlow,
       needs: messageAnalysis.needs,
@@ -2299,7 +2299,7 @@ export async function fetchAIResponse(
         : ''
       if (text) return text
       if (attempt === 0) {
-        console.info('[TalkBack/Gemini] retry chatReply (empty response)')
+        console.info('[FutureMe/Gemini] retry chatReply (empty response)')
         await sleep(1000)
       }
     }

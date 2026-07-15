@@ -24,8 +24,9 @@ const INDEX_KEY = 'futureme-profiles-index'
 const API_KEY_KEY = 'futureme-gemini-key'
 const MODEL_KEY = 'futureme-gemini-model'
 const API_CHECK_CACHE_KEY = 'futureme-api-check-cache'
-export const ONBOARDING_PROGRESS_KEY = 'futureme-onboarding-v4'
-export const ONBOARDING_PROGRESS_VERSION = 4
+// v5: 온보딩이 핵심(15)/심화 2단 구조로 재배열 — 구버전 중간 저장과 이어지지 않음
+export const ONBOARDING_PROGRESS_KEY = 'futureme-onboarding-v5'
+export const ONBOARDING_PROGRESS_VERSION = 5
 const ONBOARDING_KEY = ONBOARDING_PROGRESS_KEY
 
 /** TalkBack / 구 aime-* 마이그레이션 */

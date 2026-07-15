@@ -381,6 +381,21 @@ function StepInput({
           }}
         />
       )
+    case 'finish-offer': {
+      // 핵심 코스 끝 — 바로 시작하거나 심화 코스를 이어간다.
+      const offerIdx = ONBOARDING_STEPS.findIndex((s) => s.kind === 'finish-offer')
+      const remaining = offerIdx >= 0 ? ONBOARDING_STEPS.length - offerIdx - 1 : 0
+      return (
+        <div className="p-4 space-y-2">
+          <Button className="w-full" onClick={() => onSubmit('지금 바로 미래의 나 만나기', true)}>
+            지금 미래의 나 만나기
+          </Button>
+          <Button variant="secondary" className="w-full" onClick={() => onSubmit('더 깊게 만들기')}>
+            더 깊게 만들기 (+{remaining}문항)
+          </Button>
+        </div>
+      )
+    }
     case 'dilemma-choice':
       return (
         <ChoiceInput

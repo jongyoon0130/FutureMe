@@ -5,6 +5,12 @@ import { FUTURE_YEARS_AHEAD } from '../../lib/brand'
 import { SPEECH_TONE_OPTIONS } from '../../lib/onboardingConfig'
 import { buildProfileDashboard, type DashboardCard } from '../../lib/profileSummary'
 import {
+  applyPersonaAnswer,
+  personaCompleteness,
+  personaGaps,
+  type PersonaFieldSpec,
+} from '../../lib/personaModel'
+import {
   removeSavedDilemma,
   removeSmallAction,
   toggleSmallAction,
@@ -124,6 +130,91 @@ function ContinuityBar({ score }: { score: number }) {
         <div className="h-full bg-gradient-to-r from-accent/70 to-glow rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
       <p className="text-[11px] text-muted">{label}</p>
+    </div>
+  )
+}
+
+/**
+ * 페르소나 충실도 + "지금 채우면 좋은 질문" 카드.
+ * 온보딩을 핵심만 하고 넘어온 사용자가, 대화 품질에 가장 도움되는 질문부터
+ * 하나씩 채울 수 있게 한다. 답변은 말투 학습에도 반영된다 (applyPersonaAnswer).
+ */
+function PersonaGapsCard({ profile, onUpdate }: { profile: SelfProfile; onUpdate: (p: SelfProfile) => void }) {
+  const [openKey, setOpenKey] = useState<string | null>(null)
+  const [answer, setAnswer] = useState('')
+  const completeness = personaCompleteness(profile)
+  const gaps = personaGaps(profile, 3)
+  const pct = Math.round(completeness.overall * 100)
+
+  if (!gaps.length && pct >= 100) return null
+
+  const openGap = (field: PersonaFieldSpec) => {
+    setOpenKey(field.key)
+    setAnswer('')
+  }
+
+  const save = (field: PersonaFieldSpec) => {
+    const v = answer.trim()
+    if (!v) return
+    onUpdate(applyPersonaAnswer(profile, field, v))
+    setOpenKey(null)
+    setAnswer('')
+  }
+
+  return (
+    <div className="rounded-2xl border border-glow/30 bg-glow/8 p-4 space-y-3">
+      <div>
+        <div className="flex items-baseline justify-between">
+          <p className="text-[11px] font-medium text-accent">미래의 나, 얼마나 또렷해?</p>
+          <span className="text-xs text-muted">{pct}%</span>
+        </div>
+        <div className="h-[5px] bg-surface-2 rounded-full overflow-hidden mt-1.5">
+          <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="text-[11px] text-muted mt-1.5">
+          채울수록 대화가 진짜 나 같아져. 지금 가장 도움되는 질문부터:
+        </p>
+      </div>
+      <div className="space-y-2">
+        {gaps.map((field) =>
+          openKey === field.key ? (
+            <div key={field.key} className="rounded-xl border border-accent/30 bg-surface p-3 space-y-2">
+              <p className="text-sm text-ink leading-snug">{field.question}</p>
+              <textarea
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder={field.placeholder ?? '한두 문장이면 충분해'}
+                rows={3}
+                autoFocus
+                className="w-full rounded-xl border border-border bg-surface-2/60 p-3 text-sm resize-none focus:outline-none focus:border-accent/50"
+              />
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setOpenKey(null)} className="text-xs text-muted px-2 py-1.5">
+                  다음에
+                </button>
+                <button
+                  type="button"
+                  onClick={() => save(field)}
+                  disabled={!answer.trim()}
+                  className="text-xs font-medium text-accent px-3 py-1.5 rounded-lg bg-accent/10 disabled:opacity-40"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              key={field.key}
+              type="button"
+              onClick={() => openGap(field)}
+              className="w-full text-left rounded-xl border border-border/70 bg-surface px-3 py-2.5 text-sm text-ink/85 hover:border-accent/40 transition-colors"
+            >
+              <span className="text-[10px] text-muted block mb-0.5">{field.label}</span>
+              {field.question}
+            </button>
+          ),
+        )}
+      </div>
     </div>
   )
 }
@@ -257,6 +348,8 @@ export function ProfileSheet({ profile: p, onClose, onDelete, onUpdate }: Props)
                   </div>
                 )}
               </div>
+
+              {onUpdate && <PersonaGapsCard profile={p} onUpdate={onUpdate} />}
 
               {/* Quick stats */}
               {(dash.adviceTone || (dash.continuityScore != null && dash.continuityScore <= 0)) && (

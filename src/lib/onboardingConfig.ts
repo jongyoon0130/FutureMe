@@ -108,6 +108,7 @@ export type OnboardingStep =
   | { kind: 'dilemma-choice'; lines: string[] }
   | { kind: 'dilemma-reason'; lines: string[] }
   | { kind: 'section'; lines: string[] }
+  | { kind: 'finish-offer'; lines: string[] }
   | {
       kind: 'future-text'
       lines: string[]
@@ -125,14 +126,21 @@ export type OnboardingStep =
   | { kind: 'weekly-action'; lines: string[] }
   | { kind: 'ask-about'; lines: string[] }
 
-/** ~28단계: Future You급 생생함 + 말투 학습 + throughline */
+/**
+ * 2단 구조 — 핵심 코스(1~15)와 심화 코스(16~).
+ *
+ * 핵심 코스는 personaModel의 core 티어(정체성·말투·생생한 하루·편지)를 채우는
+ * 최소 질문이다. finish-offer에서 바로 대화를 시작할 수 있고, 심화 코스는
+ * 이어서 하거나 나중에 프로필의 "페르소나 채우기"에서 채운다.
+ */
 export const ONBOARDING_STEPS: OnboardingStep[] = [
+  // ── 핵심 코스: 지금의 나 ────────────────────────────────────────────
   {
     kind: 'name',
     lines: [
       `안녕. Future Me야.`,
       `${FUTURE_YEARS_AHEAD}년 뒤 **미래의 너**와 대화할 수 있게 만들 거야.`,
-      '핵심 질문부터 같이 잡아볼게. 막히는 서술형은 건너뛰고 나중에 프로필에서 채워도 돼.',
+      '핵심 질문 15개면 바로 시작할 수 있어. 막히면 건너뛰고 나중에 채워도 돼.',
       '먼저 부를 이름이나 별명 알려줘.',
     ],
   },
@@ -172,6 +180,73 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     maxLength: 320,
     minLength: 30,
   },
+  {
+    kind: 'speech-tone',
+    lines: [`${FUTURE_YEARS_AHEAD}년 뒤 **미래의 너**, 어떤 말투로 대화하면 좋을까?`],
+  },
+
+  // ── 핵심 코스: 미래의 나 ────────────────────────────────────────────
+  {
+    kind: 'section',
+    lines: [
+      '좋아, {name}. 이제 진짜 중요한 것.',
+      `**${FUTURE_YEARS_AHEAD}년 뒤** — 꿈꾸는 **미래의 너**를 만들어보자.`,
+      '상상해도 돼. 구체적일수록 대화가 살아나.',
+    ],
+  },
+  {
+    kind: 'future-text',
+    lines: [`${FUTURE_YEARS_AHEAD}년 뒤, 너를 **한 문장**으로`],
+    field: 'identityLine',
+    placeholder: '예: 내 속도로 성장하며 팀을 이끄는 사람',
+    maxLength: 80,
+    minLength: 8,
+  },
+  {
+    kind: 'thriving-domains',
+    lines: [`그때 인생에서 **가장 잘 풀렸으면** 하는 영역 (최대 3)`],
+    max: 3,
+  },
+  {
+    kind: 'future-text',
+    lines: [
+      `**생생함** — ${FUTURE_YEARS_AHEAD}년 뒤, 평범한 **하루**를 타임라인처럼.`,
+      '아침→낮→저녁, 어디서 뭐 하고 누구랑 있는지.',
+    ],
+    field: 'typicalDay',
+    placeholder: '예: 7시 기상, 운동, 9시 출근… 점심에 동료랑… 퇴근 후 카페에서 책',
+    maxLength: 420,
+    minLength: 40,
+  },
+  {
+    kind: 'future-text',
+    lines: [
+      `**미래의 너 말투** — ${FUTURE_YEARS_AHEAD}년 뒤 **네가** 지금의 너한테 카톡 보낸다면?`,
+      '1인칭, 3–5문장. 위에서 고른 말투 느낌으로.',
+    ],
+    field: 'futureVoiceSample',
+    placeholder: '예: 야, 지금 너무 조급해하지 마. 나 여기까지 왔는데…',
+    maxLength: 320,
+    minLength: 40,
+  },
+  {
+    kind: 'advice',
+    lines: [`지금(${FUTURE_YEARS_AHEAD}년 전)의 너한테 **편지** — 미래의 네가 꼭 해주고 싶은 말.`],
+  },
+  {
+    kind: 'weekly-action',
+    lines: [`${FUTURE_YEARS_AHEAD}년 뒤를 위해, **이번 주**에 할 한 가지`],
+  },
+  {
+    kind: 'finish-offer',
+    lines: [
+      '여기까지가 **핵심**이야. 지금 바로 미래의 너랑 대화할 수 있어.',
+      '더 깊게 만들수록 대화가 진짜같아져 — 가치관·두려움·미래의 디테일.',
+      '나중에 프로필의 **페르소나 채우기**에서 이어가도 돼.',
+    ],
+  },
+
+  // ── 심화 코스: 가치관·성장 축 ───────────────────────────────────────
   {
     kind: 'profile-text',
     lines: ['인생에서 **절대 못 놓는 것** — 딱 하나 + 왜인지'],
@@ -228,42 +303,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     maxLength: 180,
     minLength: 8,
   },
-  {
-    kind: 'speech-tone',
-    lines: [`${FUTURE_YEARS_AHEAD}년 뒤 **미래의 너**, 어떤 말투로 대화하면 좋을까?`],
-  },
-  {
-    kind: 'section',
-    lines: [
-      '좋아, {name}. **지금의 너**는 충분히 알겠어.',
-      `이제 **${FUTURE_YEARS_AHEAD}년 뒤** — 꿈꾸는 **미래의 너**를 만들어보자.`,
-      '상상해도 돼. 구체적일수록 대화가 살아나.',
-    ],
-  },
-  {
-    kind: 'future-text',
-    lines: [`${FUTURE_YEARS_AHEAD}년 뒤, 너를 **한 문장**으로`],
-    field: 'identityLine',
-    placeholder: '예: 내 속도로 성장하며 팀을 이끄는 사람',
-    maxLength: 80,
-    minLength: 8,
-  },
-  {
-    kind: 'thriving-domains',
-    lines: [`그때 인생에서 **가장 잘 풀렸으면** 하는 영역 (최대 3)`],
-    max: 3,
-  },
-  {
-    kind: 'future-text',
-    lines: [
-      `**생생함** — ${FUTURE_YEARS_AHEAD}년 뒤, 평범한 **하루**를 타임라인처럼.`,
-      '아침→낮→저녁, 어디서 뭐 하고 누구랑 있는지.',
-    ],
-    field: 'typicalDay',
-    placeholder: '예: 7시 기상, 운동, 9시 출근… 점심에 동료랑… 퇴근 후 카페에서 책',
-    maxLength: 420,
-    minLength: 40,
-  },
+
+  // ── 심화 코스: 미래의 디테일 ────────────────────────────────────────
   {
     kind: 'future-text',
     lines: [
@@ -374,27 +415,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     max: 4,
   },
   {
-    kind: 'future-text',
-    lines: [
-      `**미래의 너 말투** — ${FUTURE_YEARS_AHEAD}년 뒤 **네가** 지금의 너한테 카톡 보낸다면?`,
-      '1인칭, 3–5문장. 위에서 고른 말투 느낌으로.',
-    ],
-    field: 'futureVoiceSample',
-    placeholder: '예: 야, 지금 너무 조급해하지 마. 나 여기까지 왔는데…',
-    maxLength: 320,
-    minLength: 40,
-  },
-  {
-    kind: 'advice',
-    lines: [`지금(${FUTURE_YEARS_AHEAD}년 전)의 너한테 **편지** — 미래의 네가 꼭 해주고 싶은 말.`],
-  },
-  {
     kind: 'continuity',
     lines: ['지금의 너 ↔ 5년 뒤 너, **얼마나 이어져** 있어?'],
-  },
-  {
-    kind: 'weekly-action',
-    lines: [`${FUTURE_YEARS_AHEAD}년 뒤를 위해, **이번 주**에 할 한 가지`],
   },
   {
     kind: 'ask-about',

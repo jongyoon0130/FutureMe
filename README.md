@@ -67,13 +67,15 @@ flowchart TD
 
 ---
 
-## 4. 온보딩 — "지금의 나"와 "미래의 나"를 수집
+## 4. 온보딩 — 핵심 15문항 + 심화 24문항 (2단 구조)
 
-질문 흐름은 [src/lib/onboardingConfig.ts](src/lib/onboardingConfig.ts)의 `ONBOARDING_STEPS`(약 38단계)로 정의되고, UI는 [ChatOnboarding.tsx](src/components/onboarding/ChatOnboarding.tsx)가 그린다.
+질문 흐름은 [src/lib/onboardingConfig.ts](src/lib/onboardingConfig.ts)의 `ONBOARDING_STEPS`로 정의되고, UI는 [ChatOnboarding.tsx](src/components/onboarding/ChatOnboarding.tsx)가 그린다.
 
-**1부 — 지금의 나 (15단계):** 이름 → 나이 → 역할·상황 → 하루하루 → 신경 쓰이는 영역(칩) → **말투 학습 샘플** → 절대 못 놓는 것 → "잘 산다"의 정의 → 가치관 딜레마(선택+이유) → 힘들었던 순간 → 두려움 → 진짜 원하는 것 → 1년 뒤 성장상 → 대화 톤 선택
+**핵심 코스 (15단계):** 이름 → 나이 → 역할·상황 → 하루하루 → 신경 쓰이는 영역(칩) → **말투 학습 샘플** → 대화 톤 → (미래 전환) → 정체성 한 문장 → 잘 풀렸으면 하는 영역 → **평범한 하루(생생함)** → **미래의 나 말투 샘플** → 편지(adviceLine) → 이번 주 작은 행동 → **분기: "지금 미래의 나 만나기" vs "더 깊게 만들기"**
 
-**2부 — 5년 뒤의 나 (23단계):** 정체성 한 문장 → 잘 풀렸으면 하는 영역 → **평범한 하루(생생함)** → **도달 경로(throughline, "future memory")** → 직업/루틴/돈/관계/건강/사는 곳 → 자랑스러운 성취 → 넘어선 어려움 → 배운 것 → 피하고 싶은 미래(칩) → 될 뻔했던 길 → 별거 아니었던 걱정 → 변한 성격(칩) → **미래의 나 말투 샘플** → 편지(adviceLine) → 자아 연속성(1–7) → 이번 주 작은 행동 → 자주 물을 주제
+**심화 코스 (24단계):** 절대 못 놓는 것 → "잘 산다"의 정의 → 가치관 딜레마 → 힘들었던 순간 → 두려움 → 진짜 원하는 것 → 1년 뒤 성장상 → **도달 경로(throughline)** → 직업/루틴/돈/관계/건강/사는 곳 → 성취 → 넘어선 어려움 → 배운 것 → 피하고 싶은 미래 → 될 뻔했던 길 → 별거 아니었던 걱정 → 변한 성격 → 자아 연속성 → 자주 물을 주제
+
+핵심 코스는 [personaModel.ts](src/lib/personaModel.ts)의 **core 티어**(없으면 페르소나가 남처럼 말하는 필드)를 채우는 최소 질문이다. 건너뛴 질문은 프로필의 **페르소나 채우기**(충실도 % + 추천 질문)에서 언제든 이어서 채울 수 있고, 답변은 말투 학습에도 반영된다.
 
 설계 원리: 미래를 **한 줄 목표**가 아니라 **하루의 장면과 도달 서사**로 쓰게 하면 페르소나가 살아난다. 질문을 바꾸려면 `ONBOARDING_STEPS` 배열만 수정하면 된다.
 
@@ -199,8 +201,12 @@ bun run lint           # Oxlint
 | --- | --- |
 | [src/App.tsx](src/App.tsx) | 화면 전환: 목록 ↔ 온보딩 ↔ 채팅, 동기화 배너 |
 | [src/types/self.ts](src/types/self.ts) | 데이터 모델 (SelfProfile, FutureSelfProfile) ★먼저 읽기 |
-| [src/lib/onboardingConfig.ts](src/lib/onboardingConfig.ts) | 온보딩 질문 정의 (질문 수정은 여기) |
+| [src/lib/onboardingConfig.ts](src/lib/onboardingConfig.ts) | 온보딩 질문 정의 — 핵심/심화 2단 (질문 수정은 여기) |
+| [src/lib/personaModel.ts](src/lib/personaModel.ts) | ★페르소나 구조화: facet×tier, 충실도, 빈 곳 추천, 프롬프트 렌더링 |
 | [src/lib/selfEngine.ts](src/lib/selfEngine.ts) | 프롬프트 조립, Gemini 호출, 말투 분석, 답변 후처리 ★핵심 |
+| [src/lib/plannerStore.ts](src/lib/plannerStore.ts) | 플래너: 목표·마일스톤·작업·회고 (순수 함수) |
+| [src/lib/planSuggestionEngine.ts](src/lib/planSuggestionEngine.ts) | 목표 → 이번 주 행동 AI 초안 (JSON 검증 포함) |
+| [src/components/planner/PlannerScreen.tsx](src/components/planner/PlannerScreen.tsx) | 플래너 화면: 오늘/이번 주/목표 탭 |
 | [src/lib/storage.ts](src/lib/storage.ts) | localStorage CRUD, tombstone, 백업, 구버전 마이그레이션 |
 | [src/lib/chatDb.ts](src/lib/chatDb.ts) | IndexedDB 채팅 기록 |
 | [src/lib/cloudSync.ts](src/lib/cloudSync.ts) | Supabase 읽기/쓰기 + tombstone 행 |
@@ -234,12 +240,14 @@ bun run lint           # Oxlint
 
 ## 11. 한계 & 다음 단계
 
+> 상세 계획: [docs/ROADMAP.md](docs/ROADMAP.md) — 페르소나 × 플래너 로드맵과 우선순위
+
 | 현재 한계 | 방향 |
 | --- | --- |
 | Gemini API 키를 사용자가 직접 발급·입력 | 서버 프록시 + 사용량 관리 (키 노출 위험 제거) |
 | 채팅 병합이 프로필 단위 (동시 편집 시 한쪽 유실) | 메시지 단위 병합 |
-| 실행(작은 행동)이 채팅 안에만 존재 | **일정·단기 목표 뷰 (투두메이트식)** — 핵심 로드맵 |
-| 페르소나 품질이 온보딩 답변 품질에 좌우됨 | 질문 템플릿·예시 개선, 온보딩 후 페르소나 미리보기 |
+| 플래너와 대화의 연결이 아직 단방향 위주 | 완료 회고→대화 공급, 채팅 행동→플래너 승격 (P1) |
+| AI 계획 초안이 사용자 리듬을 모름 | 완료율·미룸 데이터를 제안 프롬프트에 반영 (P1) |
 | localStorage 용량(~5MB) 한계 | 프로필 본문도 IndexedDB로 이전 |
 
 ---

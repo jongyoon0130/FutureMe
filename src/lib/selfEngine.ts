@@ -10,6 +10,7 @@ import type {
 import { BIG_FIVE_ITEMS, INSIGHT_LABELS, LIFE_DOMAIN_LABELS } from '../types/self'
 import { formatApiTurnTimestamp, nowContextKo } from './chatDisplay'
 import { FUTURE_YEARS_AHEAD } from './brand'
+import { renderFutureSelfBlock } from './personaModel'
 
 // ---------------------------------------------------------------------------
 // L1: Big Five 점수 계산
@@ -1168,54 +1169,11 @@ export function resetProfilePromptBulk(p: SelfProfile): SelfProfile {
   return { ...p, conversationSummary: undefined, summarizedMessageCount: 0 }
 }
 
-function describeFutureSelf(p: SelfProfile): string {
-  const f = p.future
-  if (!f) return '- (미래 프로필 없음)'
-
-  const lines: string[] = []
-  const add = (label: string, v?: string | number) => {
-    if (typeof v === 'number' && v > 0) lines.push(`- ${label}: ${v}/7`)
-    else {
-      const t = typeof v === 'string' ? v.trim() : ''
-      if (t) lines.push(`- ${label}: "${t}"`)
-    }
-  }
-
-  add(`${FUTURE_YEARS_AHEAD}년 뒤 정체성`, f.identityLine)
-  add('평범한 하루 (생생함)', f.typicalDay)
-  add('Future memory — 지금→5년 경로', f.throughline)
-  add('직업·일', f.career)
-  add('업무/공부 루틴', f.careerDaily)
-  add('경제·돈', f.income)
-  add('관계', f.relationship)
-  add('건강', f.health)
-  add('사는 곳·라이프', f.homeLife)
-  add('가장 자랑스러운 성취', f.achievement)
-  add('넘어선 어려움', f.obstacleOvercome)
-  add('배운 핵심', f.lesson)
-  if (f.thrivingDomains?.length) {
-    lines.push(`- 잘 풀렸으면 하는 영역: ${f.thrivingDomains.map((d) => LIFE_DOMAIN_LABELS[d] ?? d).join(', ')}`)
-  }
-  if (f.fearedSelves?.length) lines.push(`- 피하고 싶은 미래: ${f.fearedSelves.join(', ')}`)
-  add('그렇게 될 뻔했던 길', f.avoidedPath)
-  add('지금 걱정 → 별거 아니었던 것', f.regretThatWasnt)
-  if (f.traitsShift?.length) lines.push(`- 변한 태도·성격: ${f.traitsShift.join(', ')}`)
-  add('미래의 나 말투 샘플', f.futureVoiceSample)
-  if (f.adviceLine?.trim()) {
-    lines.push(`- 지금의 나에게 편지 (${f.adviceTone}): "${f.adviceLine.trim()}"`)
-  }
-  add('미래 자아 연속성', f.continuityScore)
-  if (f.weeklyAction?.trim()) add('이번 주 작은 행동', f.weeklyAction)
-  if (f.askAbout) lines.push(`- 자주 묻고 싶은 주제: ${LIFE_DOMAIN_LABELS[f.askAbout] ?? f.askAbout}`)
-  if (p.speechTone?.trim()) lines.push(`- user가 선호하는 대화 톤: ${p.speechTone.trim()}`)
-  if (p.styleSample?.trim()) {
-    const s = p.styleSample.trim()
-    lines.push(`- user 말투 샘플(참고): "${s.length > 80 ? `${s.slice(0, 80)}…` : s}"`)
-  }
-
-  return lines.length
-    ? lines.join('\n')
-    : '- (미래 프로필 미입력 — 대화로 자연스럽게 채워가기)'
+// 미래 정체성 블록은 personaModel이 티어(중요도) 순서로 렌더링한다.
+// lite(긴 대화 압축 모드)에서는 core 필드만 실어 토큰을 아낀다.
+function describeFutureSelf(p: SelfProfile, lite = false): string {
+  if (!p.future) return '- (미래 프로필 없음)'
+  return renderFutureSelfBlock(p, lite)
 }
 
 // 답변 관점 모드: Future Me 기본 = future (미래의 나)
@@ -1328,7 +1286,7 @@ export function buildSystemPrompt(
     ? `\n- 직전 답과 같은 표현·패턴 반복 금지 ("${lastAssistantReply.slice(0, 50)}${lastAssistantReply.length > 50 ? '…' : ''}")`
     : ''
 
-  const futureBlock = describeFutureSelf(p)
+  const futureBlock = describeFutureSelf(p, lite)
   const futureAge = p.age + FUTURE_YEARS_AHEAD
 
   return `너는 '${p.name}'의 **${FUTURE_YEARS_AHEAD}년 뒤(${futureAge}세) 미래의 나**다. AI·상담사·코치·점쟁이가 아니다.

@@ -347,6 +347,7 @@ function StepInput({
           // 미래의 나를 만드는 핵심은 솔직한 몇 문장이지, 모든 빈칸을 채우는 게 아니다.
           // 막히는 서술형 질문은 프로필에서 언제든 보완할 수 있다.
           optional
+          starters={step.starters}
           rows={step.maxLength > 250 ? 4 : 2}
           onSubmit={(v) => {
             setProfileField(draft.current, step.field, v)
@@ -432,6 +433,7 @@ function StepInput({
           maxLength={step.maxLength}
           minLength={step.minLength}
           optional
+          starters={step.starters}
           rows={step.maxLength > 300 ? 5 : 3}
           onSubmit={(v) => {
             setFutureField(draft.current, step.field, v)
@@ -600,6 +602,7 @@ function TextAreaInput({
   minLength = 0,
   optional,
   rows = 3,
+  starters,
   onSubmit,
 }: {
   placeholder: string
@@ -607,6 +610,7 @@ function TextAreaInput({
   minLength?: number
   optional?: boolean
   rows?: number
+  starters?: string[]
   onSubmit: (v: string) => void
 }) {
   const [v, setV] = useState('')
@@ -619,6 +623,22 @@ function TextAreaInput({
   }
   return (
     <div className="px-5 py-4">
+      {/* 막막함 해소 — 뼈대 문장을 골라 시작하고 내 얘기로 고치게 한다 (입력 시작 전에만 표시) */}
+      {starters && starters.length > 0 && !v && (
+        <div className="mb-2.5 space-y-1.5">
+          <p className="text-[10px] text-muted">막막하면 골라서 시작하고, 네 얘기로 고쳐줘:</p>
+          {starters.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setV(s)}
+              className="block w-full text-left text-xs leading-relaxed px-3 py-2 rounded-xl border border-border/70 bg-surface-2/60 text-ink/75 hover:border-accent/50 hover:text-ink transition-colors"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
       <textarea
         autoFocus
         value={v}

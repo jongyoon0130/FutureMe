@@ -10,7 +10,8 @@ import type {
 import { BIG_FIVE_ITEMS, INSIGHT_LABELS, LIFE_DOMAIN_LABELS } from '../types/self'
 import { formatApiTurnTimestamp, nowContextKo } from './chatDisplay'
 import { FUTURE_YEARS_AHEAD } from './brand'
-import { renderFutureSelfBlock } from './personaModel'
+import { renderFutureSelfBlock, personaGaps } from './personaModel'
+import { dateKey, overdueTasks, recentReflectionsWithTask, stalledGoals } from './plannerStore'
 
 // ---------------------------------------------------------------------------
 // L1: Big Five 점수 계산
@@ -413,17 +414,35 @@ function describeGrowthContext(p: SelfProfile): string {
   }
   if (p.desire?.trim()) lines.push(`속으로 진짜 원하는 것: "${p.desire.trim().slice(0, 50)}"`)
   if (p.growthDirection?.trim()) lines.push(`되고 싶은 나: "${p.growthDirection.trim().slice(0, 50)}"`)
+  return lines.map((l) => `- ${l}`).join('\n')
+}
+
+/**
+ * 실행 리듬 — 플래너의 목표·완료 회고·멈춤·밀림을 미래의 나에게 알려준다.
+ * (deep 턴이 아니어도 실림 — "지난주에 그거 해냈잖아"는 가벼운 대화에서 나와야 자연스럽다)
+ */
+function describeExecutionRhythm(p: SelfProfile): string {
+  const lines: string[] = []
   const planner = p.planner
-  const activeGoals = planner?.goals.filter((g) => g.status === 'active').slice(0, 3) ?? []
+  const activeGoals = planner?.goals.filter((g) => g.status === 'active').slice(0, 2) ?? []
   if (activeGoals.length) {
     lines.push(
-      `지금 직접 정한 목표: ${activeGoals
+      `직접 정한 목표: ${activeGoals
         .map((g) => `"${g.title}"${g.targetDate ? ` (${g.targetDate}까지)` : ''}`)
-        .join(' / ')}. 목표를 매번 들이밀지 말고, 이번 말과 연결될 때만 참고.`,
+        .join(' / ')}`,
     )
   }
-  const recentDone = (planner?.tasks ?? []).filter((t) => t.status === 'done').slice(0, 2)
-  if (recentDone.length) lines.push(`최근 해낸 행동: ${recentDone.map((t) => `"${t.title}"`).join(', ')}.`)
+  for (const r of recentReflectionsWithTask(p, 2)) {
+    lines.push(
+      `해낸 직후 남긴 기록: "${r.taskTitle}" — ${r.emotion}${r.pride ? ` ("${r.pride.slice(0, 60)}")` : ''}`,
+    )
+  }
+  const stalled = stalledGoals(p)[0]
+  if (stalled) lines.push(`"${stalled.goal.title}" 목표가 ${stalled.stalledDays}일째 멈춰 있음`)
+  const overdue = overdueTasks(p, dateKey())
+  if (overdue.length) {
+    lines.push(`기한 지난 할 일 ${overdue.length}개 (예: "${overdue[0].title.slice(0, 40)}")`)
+  }
   return lines.map((l) => `- ${l}`).join('\n')
 }
 
@@ -1240,6 +1259,16 @@ export function buildSystemPrompt(
   const growthCtx = deep ? describeGrowthContext(p) : ''
   const growthSection = growthCtx ? `\n## 성장 축 (참고 — 매 턴 낭독 금지)\n${growthCtx}` : ''
 
+  const rhythm = lite ? '' : describeExecutionRhythm(p)
+  const rhythmSection = rhythm
+    ? `\n## 실행 리듬 (참고 — 매 턴 언급 금지)\n${rhythm}\n→ 규칙: 이번 user 말과 연결될 때만. 해낸 기록은 **먼저 알아봐주고 같이 반가워해도 좋다** ("지난번에 ~ 했잖아"). 멈춘 목표·밀린 할 일은 **대화당 최대 한 번**, user가 먼저 꺼내거나 흐름이 닿을 때만 — "나도 그런 주 있었어" 톤으로. 다그침·죄책감 유발·숙제 검사 금지.`
+    : ''
+
+  const personaGap = lite ? undefined : personaGaps(p, 1)[0]
+  const gapSection = personaGap
+    ? `\n## 아직 못 들은 것 (선택)\n- "${personaGap.question}"\n→ 대화가 가볍고 한가할 때만, 이번 대화 통틀어 최대 한 번 지나가듯 물어봐도 된다. user가 힘든 얘기 중이면 금지. 답은 기억해두면 된다.`
+    : ''
+
   const answerStructure = concretizing
     ? `## 답변 구조 (지금은 구체화 단계)
 - user 말·상황이 **아직 흐림**. 이번 턴 **판단·결론·행동 과제 금지**.
@@ -1332,7 +1361,7 @@ ${describeBehaviorExamples(lite)}
 
 ## 나 (지금 — ${p.age}세)
 ${profileLine}
-나이 ${p.age}세 · ${p.lifeContext?.trim().slice(0, 60) || '요즘 상황 미상'}${dilemmaSection}${understandingSection}${memoriesSection}${growthSection}${convoSection}${insightSection}
+나이 ${p.age}세 · ${p.lifeContext?.trim().slice(0, 60) || '요즘 상황 미상'}${dilemmaSection}${understandingSection}${memoriesSection}${growthSection}${rhythmSection}${gapSection}${convoSection}${insightSection}
 
 ## ${FUTURE_YEARS_AHEAD}년 뒤의 나 (너의 정체성)
 ${futureBlock}

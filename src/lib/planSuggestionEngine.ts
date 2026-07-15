@@ -1,5 +1,6 @@
 import type { Goal, LifeDomain, SelfProfile, TaskPriority } from '../types/self'
 import { resolveModel } from './selfEngine'
+import { completionStats } from './plannerStore'
 
 export type SuggestedMilestone = { title: string; targetDate?: string }
 export type SuggestedTask = { title: string; scheduledFor?: string; estimatedMinutes?: number; priority: TaskPriority; milestoneTitle?: string; whyNow: string }
@@ -58,7 +59,11 @@ export function buildFallbackPlanSuggestion(goal: Goal, today: string): PlanSugg
 export async function suggestPlanWithGemini(profile: SelfProfile, goal: Goal, apiKey: string, today: string, model?: string): Promise<PlanSuggestion> {
   if (!apiKey.trim()) return buildFallbackPlanSuggestion(goal, today)
   const existing = (profile.planner?.tasks ?? []).filter((t) => t.goalId === goal.id && t.status === 'todo').slice(0, 8).map((t) => t.title)
+  // 이 사람의 실제 리듬 — 계획은 이상적인 사람이 아니라 이 사람이 해낼 양이어야 한다
+  const stats = completionStats(profile, today)
+  const rhythmLine = `최근 2주 리듬: 완료 ${stats.done}개, 현재 밀린 할 일 ${stats.overdue}개`
   const prompt = `너는 개인 목표를 현실적인 이번 주 행동으로 바꾸는 계획 보조자다. 아래 목표를 보고 JSON만 출력하라.
+${rhythmLine}
 사용자의 5년 뒤 정체성: ${profile.future.identityLine || '미입력'}
 현재 상황: ${profile.currentRole || profile.lifeContext || '미입력'}
 목표: ${goal.title}
@@ -70,6 +75,7 @@ export async function suggestPlanWithGemini(profile: SelfProfile, goal: Goal, ap
 
 규칙:
 - 마일스톤 0~3개, 이번 주 작업 1~5개. 사용자가 승인하기 전 초안이다.
+- 위 리듬에 맞출 것 — 밀린 게 많거나 완료가 적으면 작업 수·시간을 보수적으로(1~2개, 짧게).
 - 한 작업은 15~120분, 구체적인 동사로 시작. 일정·사실을 지어내지 말 것.
 - 계획이 부족한 정보에 기대면 assumptions에 적고, 질문이 필요하면 caution에 짧게 적을 것.
 - 목표일 이후 날짜, 기존 작업과 똑같은 작업 금지.

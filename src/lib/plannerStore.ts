@@ -107,3 +107,64 @@ export function weekDates(anchor = new Date()): string[] {
 export const PRIORITY_LABELS: Record<TaskPriority, string> = { must: '꼭', should: '하면 좋음', could: '여유되면' }
 
 export const EMPTY_PLANNER = emptyPlanner
+
+// ---------------------------------------------------------------------------
+// 실행 리듬 읽기 — "못 해낸 날"과 "멈춘 목표"를 알아채기 위한 순수 함수들.
+// 플래너 UI(위로 카드)와 미래의 나 프롬프트(부드러운 회상)가 함께 쓴다.
+// ---------------------------------------------------------------------------
+
+/** 기한이 지났는데 아직 안 한 할 일 (오래된 것부터) */
+export function overdueTasks(profile: SelfProfile, today: string): PlanTask[] {
+  return plannerOf(profile)
+    .tasks.filter((t) => t.status === 'todo' && !!t.scheduledFor && t.scheduledFor < today)
+    .sort((a, b) => (a.scheduledFor ?? '').localeCompare(b.scheduledFor ?? ''))
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+export type StalledGoal = { goal: Goal; stalledDays: number }
+
+/**
+ * 멈춘 목표 — 연결된 할 일의 마지막 움직임(생성·완료·수정)이
+ * thresholdDays 이상 지난 활성 목표. 움직임이 아예 없으면 목표 생성일 기준.
+ */
+export function stalledGoals(profile: SelfProfile, now = Date.now(), thresholdDays = 5): StalledGoal[] {
+  const planner = plannerOf(profile)
+  const result: StalledGoal[] = []
+  for (const goal of planner.goals) {
+    if (goal.status !== 'active') continue
+    let lastActivity = goal.createdAt
+    for (const t of planner.tasks) {
+      if (t.goalId !== goal.id) continue
+      lastActivity = Math.max(lastActivity, t.updatedAt, t.completedAt ?? 0, t.createdAt)
+    }
+    const stalledDays = Math.floor((now - lastActivity) / DAY_MS)
+    if (stalledDays >= thresholdDays) result.push({ goal, stalledDays })
+  }
+  return result.sort((a, b) => b.stalledDays - a.stalledDays)
+}
+
+export type CompletionStats = { done: number; overdue: number }
+
+/** 최근 N일의 완료 개수 + 현재 밀린 할 일 개수 — AI 초안이 현실 용량을 알게 */
+export function completionStats(profile: SelfProfile, today: string, days = 14, now = Date.now()): CompletionStats {
+  const planner = plannerOf(profile)
+  const since = now - days * DAY_MS
+  const done = planner.tasks.filter((t) => t.status === 'done' && (t.completedAt ?? 0) >= since).length
+  return { done, overdue: overdueTasks(profile, today).length }
+}
+
+/** 최근 완료 회고 (해당 task 제목 포함) — 미래의 나가 회상할 재료 */
+export function recentReflectionsWithTask(
+  profile: SelfProfile,
+  limit = 2,
+): { taskTitle: string; emotion: string; pride?: string; createdAt: number }[] {
+  const planner = plannerOf(profile)
+  const taskById = new Map(planner.tasks.map((t) => [t.id, t]))
+  return planner.reflections.slice(0, limit).map((r) => ({
+    taskTitle: taskById.get(r.taskId)?.title ?? '해낸 일',
+    emotion: r.emotion,
+    pride: r.pride,
+    createdAt: r.createdAt,
+  }))
+}

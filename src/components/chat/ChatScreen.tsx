@@ -53,6 +53,7 @@ import {
   loadApiCheckCache,
 } from '../../lib/storage'
 import { addSavedDilemma, addSmallAction } from '../../lib/growthStore'
+import { addPlanTask, dateKey } from '../../lib/plannerStore'
 
 function readInitialApiStatus(): 'idle' | ApiCheckResult {
   const key = loadApiKey()?.trim() ?? ''
@@ -661,7 +662,14 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     )
     if (!text?.trim()) return
     const action = text.trim()
-    persistSelf(addSmallAction(self, action))
+    // 대화에서 정한 행동은 플래너 '오늘'에도 올려 실행으로 이어지게 한다
+    persistSelf(
+      addPlanTask(addSmallAction(self, action), {
+        title: action,
+        scheduledFor: dateKey(),
+        priority: 'should',
+      }),
+    )
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),

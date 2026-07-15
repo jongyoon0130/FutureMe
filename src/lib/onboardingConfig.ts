@@ -102,6 +102,8 @@ export type OnboardingStep =
       maxLength: number
       minLength?: number
       optional?: boolean
+      /** 막막할 때 골라서 시작하는 뼈대 문장 — 탭하면 입력창에 들어가 이어 쓸 수 있다 */
+      starters?: string[]
     }
   | { kind: 'concerns'; lines: string[]; max: number }
   | { kind: 'speech-tone'; lines: string[] }
@@ -117,6 +119,7 @@ export type OnboardingStep =
       maxLength: number
       minLength?: number
       optional?: boolean
+      starters?: string[]
     }
   | { kind: 'thriving-domains'; lines: string[]; max: number }
   | { kind: 'feared-selves'; lines: string[]; max: number }
@@ -191,7 +194,8 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     lines: [
       '좋아, {name}. 이제 진짜 중요한 것.',
       `**${FUTURE_YEARS_AHEAD}년 뒤** — 꿈꾸는 **미래의 너**를 만들어보자.`,
-      '상상해도 돼. 구체적일수록 대화가 살아나.',
+      '**정답이 아니어도 돼.** 예언이 아니라 방향이고, 나중에 언제든 바꿀 수 있어.',
+      '막막하면 예시를 골라서 시작하고, 네 얘기로 고쳐줘.',
     ],
   },
   {
@@ -201,6 +205,12 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     placeholder: '예: 내 속도로 성장하며 팀을 이끄는 사람',
     maxLength: 80,
     minLength: 8,
+    starters: [
+      '내 분야에서 믿고 맡길 수 있는 사람',
+      '내 속도로 꾸준히 성장해 온 사람',
+      '좋아하는 일로 먹고사는 사람',
+      '주변을 편하게 만들어주는 단단한 사람',
+    ],
   },
   {
     kind: 'thriving-domains',
@@ -217,6 +227,11 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     placeholder: '예: 7시 기상, 운동, 9시 출근… 점심에 동료랑… 퇴근 후 카페에서 책',
     maxLength: 420,
     minLength: 40,
+    starters: [
+      '아침에 여유 있게 일어나 운동하고, 오전엔 집중해서 일하고, 저녁엔 온전히 내 시간을 보내는 하루',
+      '출근 전 카페에서 하루를 정리하고, 일 끝나면 좋아하는 사람들이랑 저녁 먹는 하루',
+      '내 작업실(혹은 재택)에서 내 리듬대로 일하고, 주말엔 어디든 훌쩍 다녀오는 하루',
+    ],
   },
   {
     kind: 'future-text',
@@ -228,6 +243,10 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     placeholder: '예: 야, 지금 너무 조급해하지 마. 나 여기까지 왔는데…',
     maxLength: 320,
     minLength: 40,
+    starters: [
+      '야, 지금 고민하는 거 나도 다 기억나. 결론부터 말하면 괜찮아졌어. 조급해하지 말고 오늘 할 수 있는 것 하나만 해.',
+      '지금 네가 하는 걱정, 5년 뒤에 보면 생각보다 별거 아니야. 대신 그때 시작한 것들이 진짜 컸어.',
+    ],
   },
   {
     kind: 'advice',
@@ -315,6 +334,10 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     placeholder: '예: 2년차에 이직했고… 실패도 있었는데… 그때 멘토 만나서…',
     maxLength: 420,
     minLength: 40,
+    starters: [
+      '작게 시작한 시도 하나가 기회로 이어졌고, 중간에 흔들린 시기도 있었지만 방향을 다시 잡았어',
+      '2~3년차쯤 큰 결정을 하나 했고, 무서웠지만 그게 지금의 나를 만들었어',
+    ],
   },
   {
     kind: 'future-text',

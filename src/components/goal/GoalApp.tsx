@@ -36,5 +36,31 @@ export function GoalApp({ embedded = false }: { embedded?: boolean }) {
 
   if (!ready) return null
 
-  return <GoalPlanSheet profile={profile} embedded={embedded} />
+  if (embedded) return <GoalPlanSheet profile={profile} embedded />
+
+  // 단독 실행(goals.html) — 메인 앱으로 돌아갈 길이 없으면 막다른 페이지가 되므로
+  // 상단에 얇은 복귀 배너를 둔다. (홈 탭에 임베드될 때는 하단 네비가 그 역할)
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <a
+        href="/"
+        style={{
+          flexShrink: 0,
+          display: 'block',
+          padding: '8px 16px',
+          textAlign: 'center',
+          fontSize: '12px',
+          textDecoration: 'none',
+          color: 'var(--goal-accent-deep, #2f6b46)',
+          background: 'var(--goal-accent-soft, #e6f4ea)',
+          borderBottom: '1px solid var(--goal-line, #e5e8eb)',
+        }}
+      >
+        ← Future Me 앱으로 돌아가기 · 이 화면은 목표 앱 단독 미리보기예요
+      </a>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <GoalPlanSheet profile={profile} embedded={false} />
+      </div>
+    </div>
+  )
 }

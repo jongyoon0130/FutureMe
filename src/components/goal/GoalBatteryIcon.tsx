@@ -10,25 +10,33 @@ export function batteryFillColor(pct: number, hasTasks: boolean): string {
 }
 
 interface Props {
-  pct: number
+  done?: number
+  total?: number
+  pct?: number
   hasTasks: boolean
   inRange?: boolean
 }
 
-export function GoalBatteryIcon({ pct, hasTasks, inRange = true }: Props) {
-  const fillPct = hasTasks ? Math.max(0, Math.min(100, pct)) : 0
-  const fillColor = batteryFillColor(fillPct, hasTasks)
+export function GoalBatteryIcon({ done, total, pct, hasTasks, inRange = true }: Props) {
+  const fillPct =
+    hasTasks && total && total > 0
+      ? (done ?? 0) / total * 100
+      : hasTasks && pct !== undefined
+        ? pct
+        : 0
+  const colorPct = Math.round(fillPct)
+  const fillColor = batteryFillColor(colorPct, hasTasks)
   const muted = !inRange
 
   return (
     <div className={`goal-battery ${muted ? 'muted' : ''}`} aria-hidden>
       <div className="goal-battery-cap" />
       <div className="goal-battery-body">
-        {fillPct > 0 ? (
+        {hasTasks && fillPct > 0 ? (
           <div
             className="goal-battery-fill"
             style={{
-              height: `${fillPct}%`,
+              height: `${Math.max(0, Math.min(100, fillPct))}%`,
               background: fillColor,
             }}
           />

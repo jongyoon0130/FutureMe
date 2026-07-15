@@ -279,6 +279,45 @@ export function removeAggregatedItem(
   return null
 }
 
+export function updateAggregatedItemLabel(
+  plans: GoalPlan[],
+  planId: string,
+  itemId: string,
+  tier: 'daily' | 'weekly' | 'monthly',
+  label: string,
+): GoalPlan | null {
+  const plan = plans.find((p) => p.id === planId)
+  if (!plan?.hierarchy) return null
+  const h = plan.hierarchy
+
+  if (tier === 'monthly') {
+    for (const m of h.months) {
+      if (m.items.some((i) => i.id === itemId)) return setMonthItemLabel(plan, m.id, itemId, label)
+    }
+  }
+
+  if (tier === 'weekly') {
+    for (const w of h.weeks) {
+      if (w.items.some((i) => i.id === itemId)) return setWeekItemLabel(plan, w.id, itemId, label)
+    }
+  }
+
+  if (tier === 'daily') {
+    if (h.horizon === 'day-only') {
+      for (const d of h.days) {
+        if (d.items.some((i) => i.id === itemId)) return setDayItemLabel(plan, null, d.id, itemId, label)
+      }
+    } else {
+      for (const w of h.weeks) {
+        for (const d of w.days) {
+          if (d.items.some((i) => i.id === itemId)) return setDayItemLabel(plan, w.id, d.id, itemId, label)
+        }
+      }
+    }
+  }
+  return null
+}
+
 /** @deprecated */
 export function toggleMonthItem(plan: GoalPlan, itemId: string): GoalPlan {
   const m = plan.hierarchy?.months[0]

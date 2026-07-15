@@ -18,7 +18,7 @@ function TrashIcon() {
 function shouldStartDrag(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null
   if (!el?.closest) return true
-  if (el.closest('input, textarea, select, .goal-chk-drill')) return false
+  if (el.closest('input, textarea, select, .goal-chk-tap, .goal-chk, .goal-chk-input, .goal-chk-drill')) return false
   return true
 }
 

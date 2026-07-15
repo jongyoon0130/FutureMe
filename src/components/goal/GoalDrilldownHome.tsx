@@ -3,9 +3,9 @@ import {
   MISC_PLAN_ID,
   loadMiscTodos,
   miscAggregatedForDate,
-  miscDailyStats,
   removeMiscTodo,
   toggleMiscTodo,
+  updateMiscTodoLabel,
   type MiscTodoItem,
 } from '../../lib/goalMiscTodos'
 import type { SelfProfile } from '../../types/self'
@@ -13,7 +13,6 @@ import type { GoalPlan } from '../../types/goalPlan'
 import {
   aggregateForDate,
   countItems,
-  dailyCompletionStats,
   getCurrentWeek,
   itemsPreview,
   pctItems,
@@ -33,6 +32,7 @@ import {
   removeWeekItem,
   removeAggregatedItem,
   toggleAggregatedItem,
+  updateAggregatedItemLabel,
   toggleDayItem,
   toggleMonthNodeItem,
   toggleWeekItemH,
@@ -262,11 +262,19 @@ export function GoalDrilldownHome({
   const getDailyStats = useCallback(
     (day: number) => {
       const date = new Date(calYear, calMonth, day, 12, 0, 0, 0)
-      const goalStats = dailyCompletionStats(plans, date)
-      const miscStats = miscDailyStats(miscTodos, date)
-      const total = goalStats.total + miscStats.total
-      const done = goalStats.done + miscStats.done
-      const inRange = goalStats.inRange || miscStats.total > 0
+      const goalAgg = aggregateForDate(plans, date)
+      const miscAgg = miscAggregatedForDate(miscTodos, date)
+      const all = [
+        ...goalAgg.daily,
+        ...goalAgg.weekly,
+        ...goalAgg.monthly,
+        ...miscAgg.daily,
+        ...miscAgg.weekly,
+        ...miscAgg.monthly,
+      ]
+      const { done, total } = countItems(all)
+      const inRange =
+        plans.some((p) => p.hierarchy && resolveDateSlots(p.hierarchy, date).inRange) || total > 0
       if (!total) return { done: 0, total: 0, pct: 0, inRange }
       return { done, total, pct: Math.round((done / total) * 100), inRange }
     },
@@ -347,6 +355,14 @@ export function GoalDrilldownHome({
                     return
                   }
                   const u = removeAggregatedItem(plans, it.planId, it.id, key)
+                  if (u) persist(u)
+                }}
+                onLabelChange={(label) => {
+                  if (it.planId === MISC_PLAN_ID) {
+                    setMiscTodos(updateMiscTodoLabel(profile.id, miscTodos, it.id, label))
+                    return
+                  }
+                  const u = updateAggregatedItemLabel(plans, it.planId, it.id, key, label)
                   if (u) persist(u)
                 }}
                 onDrill={it.planId === MISC_PLAN_ID ? undefined : () => openTierFromHome(it.planId, key)}

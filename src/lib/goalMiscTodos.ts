@@ -85,6 +85,17 @@ export function removeMiscTodo(profileId: string, items: MiscTodoItem[], itemId:
   return next
 }
 
+export function updateMiscTodoLabel(
+  profileId: string,
+  items: MiscTodoItem[],
+  itemId: string,
+  label: string,
+): MiscTodoItem[] {
+  const next = items.map((it) => (it.id === itemId ? { ...it, label } : it))
+  saveMiscTodos(profileId, next)
+  return next
+}
+
 function toAggregated(items: MiscTodoItem[]): AggregatedItem[] {
   return items.map((it) => ({
     id: it.id,

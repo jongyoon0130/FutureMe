@@ -184,7 +184,6 @@ export function MiniCalendar({
           const stats = getDailyStats?.(day)
           const hasTasks = (stats?.total ?? 0) > 0
           const inRange = stats?.inRange ?? false
-          const pct = stats?.pct ?? 0
 
           const cls = [
             'goal-mc-cell',
@@ -199,7 +198,13 @@ export function MiniCalendar({
 
           const inner = (
             <>
-              <GoalBatteryIcon pct={pct} hasTasks={hasTasks} inRange={inRange} />
+              <GoalBatteryIcon
+                done={stats?.done}
+                total={stats?.total}
+                pct={stats?.pct}
+                hasTasks={hasTasks}
+                inRange={inRange}
+              />
               <span className={`goal-mc-day ${isSelected ? 'selected-num' : isToday ? 'today-num' : ''}`}>{day}</span>
             </>
           )
@@ -275,6 +280,7 @@ export function GoalCheckRow({
   onToggle,
   onRemove,
   onDrill,
+  onLabelChange,
 }: {
   done: boolean
   goalName?: string
@@ -282,18 +288,58 @@ export function GoalCheckRow({
   onToggle: () => void
   onRemove?: () => void
   onDrill?: () => void
+  onLabelChange?: (label: string) => void
 }) {
+  const [editing, setEditing] = useState(false)
+
   const row = (
     <div className={`goal-chk-row ${done ? 'done' : ''}`}>
-      <button type="button" className="goal-chk" onClick={onToggle}>
+      <button
+        type="button"
+        className="goal-chk"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggle()
+        }}
+      >
         {done ? <CheckIcon /> : null}
       </button>
       <div className="goal-chk-body" style={{ flex: 1, minWidth: 0 }}>
         {goalName ? <div className="goal-chk-goal">{goalName}</div> : null}
-        <span className="goal-txt">{text}</span>
+        {onLabelChange ? (
+          editing ? (
+            <input
+              type="text"
+              className="goal-txt goal-chk-input"
+              value={text}
+              autoFocus
+              onChange={(e) => onLabelChange(e.target.value)}
+              onBlur={() => setEditing(false)}
+              onPointerDown={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <button
+              type="button"
+              className="goal-chk-tap"
+              onClick={() => setEditing(true)}
+            >
+              <span className="goal-txt">{text}</span>
+            </button>
+          )
+        ) : (
+          <span className="goal-txt">{text}</span>
+        )}
       </div>
       {onDrill ? (
-        <button type="button" className="goal-chk-drill" onClick={onDrill} aria-label="상세 보기">
+        <button
+          type="button"
+          className="goal-chk-drill"
+          aria-label="상세 보기"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDrill()
+          }}
+        >
           ›
         </button>
       ) : null}

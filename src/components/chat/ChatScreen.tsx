@@ -52,7 +52,8 @@ import {
   loadApiCheckCache,
 } from '../../lib/storage'
 import { addSavedDilemma, addSmallAction } from '../../lib/growthStore'
-import { addPlanTask, dateKey } from '../../lib/plannerStore'
+import { addMiscTodo, loadMiscTodos } from '../../lib/goalMiscTodos'
+import { getGoalAppOwnerId } from '../../lib/goalAppOwner'
 
 function readInitialApiStatus(): 'idle' | ApiCheckResult {
   const key = loadApiKey()?.trim() ?? ''
@@ -661,14 +662,14 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     )
     if (!text?.trim()) return
     const action = text.trim()
-    // 대화에서 정한 행동은 플래너 '오늘'에도 올려 실행으로 이어지게 한다
-    persistSelf(
-      addPlanTask(addSmallAction(self, action), {
-        title: action,
-        scheduledFor: dateKey(),
-        priority: 'should',
-      }),
-    )
+    persistSelf(addSmallAction(self, action))
+    // 대화에서 정한 행동은 홈 계획표의 '오늘 할 일'에도 올려 실행으로 이어지게 한다
+    try {
+      const owner = getGoalAppOwnerId()
+      addMiscTodo(owner, loadMiscTodos(owner), 'daily', new Date(), action)
+    } catch {
+      /* 홈 계획표 저장 실패는 조용히 무시 — 채팅 흐름을 막지 않는다 */
+    }
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),

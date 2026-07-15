@@ -343,6 +343,20 @@ export function GoalCheckRow({
           ›
         </button>
       ) : null}
+      {/* 스와이프 삭제는 마우스·데스크톱에서 발견이 어려움 — 보이는 삭제 버튼 병행 */}
+      {onRemove ? (
+        <button
+          type="button"
+          className="goal-chk-remove"
+          aria-label="삭제"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
+        >
+          ×
+        </button>
+      ) : null}
     </div>
   )
 

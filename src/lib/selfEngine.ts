@@ -12,6 +12,7 @@ import { formatApiTurnTimestamp, nowContextKo } from './chatDisplay'
 import { FUTURE_YEARS_AHEAD } from './brand'
 import { renderFutureSelfBlock, personaGaps } from './personaModel'
 import { dateKey, overdueTasks, recentReflectionsWithTask, stalledGoals } from './plannerStore'
+import { describeGoalBoardForPrompt } from './goalPlanBridge'
 
 // ---------------------------------------------------------------------------
 // L1: Big Five 점수 계산
@@ -443,6 +444,11 @@ function describeExecutionRhythm(p: SelfProfile): string {
   if (overdue.length) {
     lines.push(`기한 지난 할 일 ${overdue.length}개 (예: "${overdue[0].title.slice(0, 40)}")`)
   }
+
+  // 홈 계획표(목표 앱)의 최종 목표·동기 — 읽기 전용 다리
+  const board = describeGoalBoardForPrompt()
+  if (board) lines.push(...board.split('\n'))
+
   return lines.map((l) => `- ${l}`).join('\n')
 }
 

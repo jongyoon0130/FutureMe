@@ -1,5 +1,5 @@
 import type { SelfProfile, ChatMessage } from '../types/self'
-import { emptyFutureSelf, normalizeFutureSelf } from '../types/self'
+import { emptyFutureSelf, normalizeFutureSelf, normalizePlanner } from '../types/self'
 import { resolveModel } from './selfEngine'
 import { formatListPreview } from './chatDisplay'
 import { buildDefaultListPreview } from './profileSummary'
@@ -149,6 +149,7 @@ export function loadProfileById(id: string): SelfProfile | null {
     const parsed = JSON.parse(raw) as SelfProfile
     if (!parsed.future) parsed.future = emptyFutureSelf()
     else parsed.future = normalizeFutureSelf(parsed.future)
+    parsed.planner = normalizePlanner(parsed.planner)
     return parsed
   } catch {
     return null

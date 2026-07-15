@@ -412,6 +412,17 @@ function describeGrowthContext(p: SelfProfile): string {
   }
   if (p.desire?.trim()) lines.push(`속으로 진짜 원하는 것: "${p.desire.trim().slice(0, 50)}"`)
   if (p.growthDirection?.trim()) lines.push(`되고 싶은 나: "${p.growthDirection.trim().slice(0, 50)}"`)
+  const planner = p.planner
+  const activeGoals = planner?.goals.filter((g) => g.status === 'active').slice(0, 3) ?? []
+  if (activeGoals.length) {
+    lines.push(
+      `지금 직접 정한 목표: ${activeGoals
+        .map((g) => `"${g.title}"${g.targetDate ? ` (${g.targetDate}까지)` : ''}`)
+        .join(' / ')}. 목표를 매번 들이밀지 말고, 이번 말과 연결될 때만 참고.`,
+    )
+  }
+  const recentDone = (planner?.tasks ?? []).filter((t) => t.status === 'done').slice(0, 2)
+  if (recentDone.length) lines.push(`최근 해낸 행동: ${recentDone.map((t) => `"${t.title}"`).join(', ')}.`)
   return lines.map((l) => `- ${l}`).join('\n')
 }
 

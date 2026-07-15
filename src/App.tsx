@@ -3,6 +3,7 @@ import type { SelfProfile } from './types/self'
 import { ChatOnboarding } from './components/onboarding/ChatOnboarding'
 import { ChatScreen } from './components/chat/ChatScreen'
 import { ProfileListScreen } from './components/list/ProfileListScreen'
+import { PlannerScreen } from './components/planner/PlannerScreen'
 import { AuthScreen } from './components/auth/AuthScreen'
 import { APP_NAME } from './lib/brand'
 import { FutureMeLogo } from './components/brand/FutureMeLogo'
@@ -25,7 +26,7 @@ import {
   type ProfileSummary,
 } from './lib/storage'
 
-type Screen = 'list' | 'onboarding' | 'chat'
+type Screen = 'list' | 'onboarding' | 'chat' | 'planner'
 
 export default function App() {
   const { configured, loading: authLoading, syncing, session } = useAuth()
@@ -34,6 +35,7 @@ export default function App() {
   const [summaries, setSummaries] = useState<ProfileSummary[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [profile, setProfile] = useState<SelfProfile | null>(null)
+  const [pendingChatPrompt, setPendingChatPrompt] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
   const refreshList = useCallback(() => {
@@ -78,6 +80,11 @@ export default function App() {
     setActiveProfileId(saved.id)
     setProfile(saved)
     setScreen('chat')
+  }
+
+  const handleProfileUpdate = (next: SelfProfile) => {
+    saveProfileRecord(next)
+    setProfile(next)
   }
 
   const handleBackFromChat = () => {
@@ -201,7 +208,21 @@ export default function App() {
             profile={profile}
             onBack={handleBackFromChat}
             onProfileDeleted={handleProfileDeleted}
-            onProfileUpdate={setProfile}
+            onProfileUpdate={handleProfileUpdate}
+            onOpenPlanner={() => setScreen('planner')}
+            initialPrompt={pendingChatPrompt}
+            onInitialPromptUsed={() => setPendingChatPrompt(null)}
+          />
+        )}
+        {screen === 'planner' && profile && (
+          <PlannerScreen
+            profile={profile}
+            onBack={() => setScreen('chat')}
+            onProfileUpdate={handleProfileUpdate}
+            onAskFuture={(prompt) => {
+              setPendingChatPrompt(prompt)
+              setScreen('chat')
+            }}
           />
         )}
       </div>

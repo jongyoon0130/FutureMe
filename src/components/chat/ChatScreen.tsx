@@ -83,6 +83,9 @@ interface Props {
   onBack: () => void
   onProfileDeleted: () => void
   onProfileUpdate: (p: SelfProfile) => void
+  onOpenPlanner: () => void
+  initialPrompt?: string | null
+  onInitialPromptUsed?: () => void
 }
 
 const MAX_SAMPLES = 60
@@ -101,7 +104,7 @@ function stripLegacyIntro(messages: ChatMessage[]): ChatMessage[] {
   return messages
 }
 
-export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onProfileUpdate }: Props) {
+export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onProfileUpdate, onOpenPlanner, initialPrompt, onInitialPromptUsed }: Props) {
   const [self, setSelf] = useState<SelfProfile>(profile)
 
   const persistSelf = (next: SelfProfile) => {
@@ -114,6 +117,12 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
   const [importStatus, setImportStatus] = useState<'idle' | 'ok' | 'fail'>('idle')
   const [input, setInput] = useState('')
   const [typing, setTyping] = useState(false)
+
+  useEffect(() => {
+    if (!initialPrompt) return
+    setInput(initialPrompt)
+    onInitialPromptUsed?.()
+  }, [initialPrompt, onInitialPromptUsed])
   const [revealProgress, setRevealProgress] = useState<{ msgId: string; shown: number } | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -795,6 +804,14 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
           </div>
         </button>
         <div className="flex gap-1 items-center">
+          <button
+            type="button"
+            onClick={onOpenPlanner}
+            className="text-muted hover:text-ink p-2 rounded-lg hover:bg-ink/5 text-xs whitespace-nowrap"
+            title="내 플래너"
+          >
+            계획
+          </button>
           <button
             onClick={() => setShowSettings(!showSettings)}
             className="relative text-muted hover:text-ink p-2 rounded-lg hover:bg-ink/5 text-sm"

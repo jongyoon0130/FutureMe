@@ -344,7 +344,9 @@ function StepInput({
           placeholder={step.placeholder}
           maxLength={step.maxLength}
           minLength={step.minLength}
-          optional={step.optional}
+          // 미래의 나를 만드는 핵심은 솔직한 몇 문장이지, 모든 빈칸을 채우는 게 아니다.
+          // 막히는 서술형 질문은 프로필에서 언제든 보완할 수 있다.
+          optional
           rows={step.maxLength > 250 ? 4 : 2}
           onSubmit={(v) => {
             setProfileField(draft.current, step.field, v)
@@ -400,6 +402,7 @@ function StepInput({
           placeholder="한두 문장이면 충분해"
           maxLength={180}
           minLength={5}
+          optional
           rows={2}
           onSubmit={(v) => {
             if (dilemmaDraft.current) dilemmaDraft.current.reason = v
@@ -413,7 +416,7 @@ function StepInput({
           placeholder={step.placeholder}
           maxLength={step.maxLength}
           minLength={step.minLength}
-          optional={step.optional}
+          optional
           rows={step.maxLength > 300 ? 5 : 3}
           onSubmit={(v) => {
             setFutureField(draft.current, step.field, v)

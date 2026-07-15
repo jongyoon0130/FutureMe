@@ -101,6 +101,92 @@ export interface FutureSelfNote {
   sourceMessageId?: string
 }
 
+// ---------------------------------------------------------------------------
+// 플래너 — 목표 → 마일스톤 → 이번 주 행동 → 완료 회고
+// LLM은 이 구조의 초안만 제안하고, 저장은 사용자가 확정한 뒤에만 한다.
+// ---------------------------------------------------------------------------
+
+export type GoalHorizon = 'week' | 'month' | 'quarter' | 'half_year' | 'year' | 'custom'
+export type GoalStatus = 'active' | 'paused' | 'completed' | 'abandoned'
+export type TaskStatus = 'todo' | 'done' | 'skipped'
+export type TaskPriority = 'must' | 'should' | 'could'
+
+export interface Goal {
+  id: string
+  title: string
+  /** 이 목표를 이루려는 이유 — AI 제안과 미래의 나 대화의 기준 */
+  purpose: string
+  /** 이뤘을 때 눈에 보이는 상태 */
+  desiredOutcome: string
+  /** 5년 뒤의 나와 어떻게 연결되는지 */
+  futureConnection: string
+  domain: LifeDomain
+  horizon: GoalHorizon
+  startDate: string
+  targetDate: string
+  status: GoalStatus
+  createdAt: number
+  updatedAt: number
+}
+
+export interface Milestone {
+  id: string
+  goalId: string
+  title: string
+  targetDate?: string
+  done: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface PlanTask {
+  id: string
+  goalId?: string
+  milestoneId?: string
+  title: string
+  scheduledFor?: string // YYYY-MM-DD, 시간 단위 일정은 다음 단계에서 확장
+  estimatedMinutes?: number
+  priority: TaskPriority
+  status: TaskStatus
+  completedAt?: number
+  createdAt: number
+  updatedAt: number
+}
+
+export interface CompletionReflection {
+  id: string
+  taskId: string
+  goalId?: string
+  emotion: string
+  pride?: string
+  learning?: string
+  futureCloseness?: string
+  createdAt: number
+}
+
+export interface PlannerData {
+  goals: Goal[]
+  milestones: Milestone[]
+  tasks: PlanTask[]
+  reflections: CompletionReflection[]
+}
+
+export function emptyPlanner(): PlannerData {
+  return { goals: [], milestones: [], tasks: [], reflections: [] }
+}
+
+export function normalizePlanner(raw: unknown): PlannerData {
+  const base = emptyPlanner()
+  if (!raw || typeof raw !== 'object') return base
+  const data = raw as Partial<PlannerData>
+  return {
+    goals: Array.isArray(data.goals) ? data.goals : [],
+    milestones: Array.isArray(data.milestones) ? data.milestones : [],
+    tasks: Array.isArray(data.tasks) ? data.tasks : [],
+    reflections: Array.isArray(data.reflections) ? data.reflections : [],
+  }
+}
+
 /** 미래의 나 온보딩 — 인생 영역 */
 export type LifeDomain = 'work' | 'money' | 'relationship' | 'health' | 'growth' | 'meaning'
 
@@ -323,6 +409,8 @@ export interface SelfProfile {
   savedDilemmas?: SavedDilemma[]
   smallActions?: SmallAction[]
   futureSelfNotes?: FutureSelfNote[]
+  /** 프로필별 목표·일정·회고. 기존 프로필에는 없을 수 있어 항상 빈 값으로 정규화한다. */
+  planner?: PlannerData
   // 긴 대화 맥락: 오래된 턴은 요약으로 압축, 최근 턴은 원문 유지
   conversationSummary?: string
   summarizedMessageCount?: number // 요약에 포함된 메시지 수 (앞쪽부터)
@@ -369,6 +457,7 @@ export function emptyProfile(): SelfProfile {
     savedDilemmas: [],
     smallActions: [],
     futureSelfNotes: [],
+    planner: emptyPlanner(),
     summarizedMessageCount: 0,
   }
 }

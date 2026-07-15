@@ -32,7 +32,7 @@
 | 긴 대화도 맥락 유지 | 최근 16턴 원문 + 이전 대화는 AI 요약으로 압축 |
 | 데이터 신뢰 | 삭제 기록(tombstone)으로 "지운 프로필이 되살아나지 않게" 보장, 동기화 실패 시 배너 표시 |
 
-**로드맵 (차별점):** 5년 뒤의 나와 단기 목표를 입력받은 뒤, 투두메이트처럼 **일정·작은 실행을 보여주고 채워가며** 사용자가 미래의 나에게 가까워지게 돕는 기능. (계획을 대신 짜주는 방향은 의도적으로 배제 — 계획은 매일 어긋나고, 어긋난 계획은 오히려 의지를 꺾는다.)
+**플래너:** 목표를 `왜 이루려는지 · 이룬 모습 · 5년 뒤의 나와의 연결 · 기간`으로 저장하고, 오늘·이번 주의 행동과 완료 회고로 이어간다. AI는 마일스톤과 이번 주 행동을 **초안으로만 제안**하며, 사용자가 확인하기 전에는 어떤 일정도 저장하지 않는다. 계획을 대신 통제하는 방향은 의도적으로 배제한다.
 
 ---
 
@@ -53,6 +53,8 @@ flowchart TD
     I --> J[Gemini — 미래의 나 응답]
     J --> H
     H --> K[설정: API 키 / 백업 / 삭제]
+    H --> P[내 플래너: 목표 / 오늘 / 이번 주]
+    P --> R[완료 회고 → 미래의 나 맥락]
     H --> M[← 목록]
     M --> C
 ```
@@ -89,7 +91,8 @@ SelfProfile ─── 프로필(채팅방) 하나의 전체 데이터
 │   futureVoiceSample, adviceLine(+adviceTone), weeklyAction …
 ├─ 말투: styleSamples(원문) + styleRules(자동 분석 규칙서)
 ├─ 대화 축적: insights(잠정 관찰), conversationSummary(오래된 대화 요약)
-└─ 성장 액션: savedDilemmas(고민), smallActions(작은 행동), futureSelfNotes(메모)
+├─ 성장 액션: savedDilemmas(고민), smallActions(작은 행동), futureSelfNotes(메모)
+└─ 플래너: goals(목표), milestones(마일스톤), tasks(오늘·주간 행동), reflections(완료 회고)
 ```
 
 구버전(필드 구조가 다른) 프로필은 `normalizeFutureSelf()`가 자동 변환한다.

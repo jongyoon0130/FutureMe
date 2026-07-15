@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FutureMe · 월/주/일 목표 구조 컨셉</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+  <style>
+    :root {
+      --ink: #14171c; --muted: #7a8494; --line: #e8ecf1; --bg: #f4f6f8; --surface: #fff;
+      --accent: #0d8f86; --accent-soft: #e6f6f4;
+      --violet: #5b5fc7; --violet-soft: #eceefb;
+      --warn: #d4891a; --warn-soft: #fbf1e0;
+      --month: #0d8f86; --week: #5b5fc7; --day: #d4891a;
+      --font: "Pretendard Variable", Pretendard, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--ink); line-height: 1.5; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 28px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 8px; }
+    .lead { font-size: 15px; color: #3b4450; max-width: 52ch; margin-bottom: 32px; }
+    .rec {
+      background: linear-gradient(135deg, var(--accent-soft), #fff);
+      border: 1px solid rgba(13,143,134,.2); border-radius: 16px;
+      padding: 16px 18px; margin-bottom: 36px; font-size: 14px;
+    }
+    .rec strong { color: var(--accent); }
+
+    /* Flow diagram */
+    .flow {
+      display: flex; align-items: stretch; gap: 0; margin-bottom: 40px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
+      overflow: hidden; box-shadow: 0 8px 28px rgba(20,23,28,.05);
+    }
+    .flow-step {
+      flex: 1; padding: 20px 18px; border-right: 1px solid var(--line);
+      position: relative;
+    }
+    .flow-step:last-child { border-right: none; }
+    .flow-step::after {
+      content: "→"; position: absolute; right: -10px; top: 50%; transform: translateY(-50%);
+      width: 20px; height: 20px; background: var(--bg); border-radius: 50%;
+      display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--muted);
+      z-index: 1; border: 1px solid var(--line);
+    }
+    .flow-step:last-child::after { display: none; }
+    .flow-tag {
+      font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+      padding: 4px 8px; border-radius: 6px; display: inline-block; margin-bottom: 8px;
+    }
+    .flow-tag.m { background: var(--accent-soft); color: var(--month); }
+    .flow-tag.w { background: var(--violet-soft); color: var(--week); }
+    .flow-tag.d { background: var(--warn-soft); color: var(--day); }
+    .flow-step h3 { font-size: 15px; font-weight: 750; margin-bottom: 6px; }
+    .flow-step p { font-size: 12px; color: var(--muted); }
+
+    .section-title {
+      font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 14px;
+    }
+
+    /* Mockup tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab {
+      padding: 10px 16px; border-radius: 12px; border: 1px solid var(--line);
+      background: var(--surface); font-size: 13px; font-weight: 650; cursor: pointer;
+    }
+    .tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+    .mock {
+      display: none; background: var(--surface); border: 1px solid var(--line);
+      border-radius: 24px; overflow: hidden; box-shadow: 0 12px 40px rgba(20,23,28,.08);
+      max-width: 420px; margin: 0 auto 40px;
+    }
+    .mock.active { display: block; }
+    .mock-status { height: 44px; background: #fafbfc; border-bottom: 1px solid var(--line); }
+    .mock-body { padding: 16px; min-height: 520px; }
+
+    .anno {
+      max-width: 420px; margin: -28px auto 48px; padding: 0 8px;
+    }
+    .anno li {
+      font-size: 12px; color: var(--muted); margin-bottom: 6px; padding-left: 14px;
+      position: relative; list-style: none;
+    }
+    .anno li::before {
+      content: ""; position: absolute; left: 0; top: 7px;
+      width: 6px; height: 6px; border-radius: 2px; background: var(--accent);
+    }
+
+    /* Calendar mock */
+    .cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .cal-head strong { font-size: 17px; font-weight: 800; }
+    .month-goal-card {
+      background: var(--accent-soft); border: 1px solid rgba(13,143,134,.2);
+      border-radius: 14px; padding: 12px; margin-bottom: 14px;
+    }
+    .month-goal-card .label {
+      font-size: 10px; font-weight: 800; color: var(--month); letter-spacing: .04em;
+      margin-bottom: 4px;
+    }
+    .month-goal-card p { font-size: 13px; font-weight: 650; }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-dow { text-align: center; font-size: 9px; font-weight: 700; color: var(--muted); padding: 4px 0; }
+    .cal-cell {
+      aspect-ratio: 1; border-radius: 10px; background: #f1f4f7;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 650; color: var(--muted); position: relative;
+      border: 2px solid transparent;
+    }
+    .cal-cell.in-week { background: var(--violet-soft); }
+    .cal-cell.today { border-color: var(--day); background: var(--warn-soft); color: var(--ink); }
+    .cal-cell.selected { box-shadow: 0 0 0 2px var(--accent); }
+    .cal-cell .dots { display: flex; gap: 2px; margin-top: 2px; }
+    .cal-cell .dots i { width: 4px; height: 4px; border-radius: 1px; display: block; }
+
+    /* Week band */
+    .week-band {
+      display: flex; gap: 6px; margin: 14px -4px 14px; overflow-x: auto; padding: 4px;
+    }
+    .week-band::-webkit-scrollbar { display: none; }
+    .week-pill {
+      flex: 0 0 auto; min-width: 72px; padding: 10px 8px; border-radius: 12px;
+      background: #f1f4f7; text-align: center; font-size: 10px; font-weight: 700;
+      border: 2px solid transparent;
+    }
+    .week-pill.active { background: var(--violet); color: #fff; }
+    .week-pill .wl { opacity: .7; font-size: 9px; }
+    .week-pill .wd { font-size: 11px; margin-top: 2px; }
+
+    .layer-card {
+      border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 10px;
+    }
+    .layer-card .layer-label {
+      font-size: 10px; font-weight: 800; letter-spacing: .04em; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .layer-card .layer-label i {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    .layer-card.m .layer-label { color: var(--month); }
+    .layer-card.m .layer-label i { background: var(--month); }
+    .layer-card.w .layer-label { color: var(--week); }
+    .layer-card.w .layer-label i { background: var(--week); }
+    .layer-card.d .layer-label { color: var(--day); }
+    .layer-card.d .layer-label i { background: var(--day); }
+    .layer-card p { font-size: 13px; font-weight: 600; }
+    .layer-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+    .task {
+      display: flex; gap: 10px; align-items: flex-start; padding: 10px;
+      background: #f6f8fa; border-radius: 12px; margin-top: 6px;
+    }
+    .task .chk {
+      width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line);
+      flex-shrink: 0;
+    }
+    .task.done .chk { background: var(--ok, #1a9a52); border-color: var(--ok, #1a9a52); }
+    .task strong { font-size: 12px; font-weight: 650; display: block; }
+    .task span { font-size: 10px; color: var(--muted); }
+
+    .compare {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 32px;
+    }
+    @media (max-width: 700px) { .compare { grid-template-columns: 1fr; } .flow { flex-direction: column; } .flow-step::after { display: none; } .flow-step { border-right: none; border-bottom: 1px solid var(--line); } }
+    .compare-box {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px;
+    }
+    .compare-box.bad { border-color: #f0c4c4; background: #fffafa; }
+    .compare-box.good { border-color: rgba(13,143,134,.25); background: #fafffe; }
+    .compare-box h4 { font-size: 14px; font-weight: 750; margin-bottom: 8px; }
+    .compare-box p { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0 32px;
+      font-size: 12px; font-weight: 600; color: var(--ink);
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>월 → 주 → 일 목표 구조</h1>
+    <p class="lead">달력 하나로 “이번 달 어디까지”와 “오늘 뭘 할지”를 연결하는 컨셉입니다. 탭으로 3단계 화면을 넘겨보세요.</p>
+
+    <div class="rec">
+      <strong>추천 원칙:</strong> 달력은 <em>날짜 선택 + 진행 시각화</em>만. 월/주/일 목표 문장은 달력 <em>아래 3장 카드</em>로 고정. 사용자는 위에서 날짜만 고르고, 아래에서 “이 날짜가 속한 달·주·오늘”을 한 번에 봅니다.
+    </div>
+
+    <div class="flow">
+      <div class="flow-step">
+        <span class="flow-tag m">월간</span>
+        <h3>이번 달 결과</h3>
+        <p>목표당 1문장<br>예: “9월 출시 MVP 완성”</p>
+      </div>
+      <div class="flow-step">
+        <span class="flow-tag w">주간</span>
+        <h3>이번 주 포커스</h3>
+        <p>월간에서 쪼갠 1~2개<br>예: “온보딩·크래시 제거”</p>
+      </div>
+      <div class="flow-step">
+        <span class="flow-tag d">일간</span>
+        <h3>오늘 할 일</h3>
+        <p>주간에서 뽑은 3개<br>체크하면 달력 점 채워짐</p>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i style="background:var(--month)"></i> 월간 = 목표당 상단 카드 1개</span>
+      <span><i style="background:var(--violet-soft);border:1px solid var(--violet)"></i> 주간 = 달력 주 행 하이라이트 + 주 pill</span>
+      <span><i style="background:var(--warn-soft);border:1px solid var(--day)"></i> 일간 = 선택일 + Today 체크리스트</span>
+    </div>
+
+    <p class="section-title">화면 컨셉 — 탭으로 전환</p>
+    <div class="tabs">
+      <button type="button" class="tab active" data-tab="1">① 월간 뷰</button>
+      <button type="button" class="tab" data-tab="2">② 주 선택</button>
+      <button type="button" class="tab" data-tab="3">③ 일간 (오늘)</button>
+    </div>
+
+    <!-- Mock 1: Month -->
+    <div class="mock active" id="mock-1">
+      <div class="mock-status"></div>
+      <div class="mock-body">
+        <div class="cal-head"><strong>7월</strong><span style="font-size:11px;color:var(--muted)">2026</span></div>
+        <div class="month-goal-card">
+          <div class="label">🚀 월간 · iOS 앱 출시</div>
+          <p>7월: 핵심 기능 완성 + TestFlight</p>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>
+          <div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell">1<div class="dots"><i style="background:var(--month)"></i></div></div>
+          <div class="cal-cell">2</div><div class="cal-cell">3</div><div class="cal-cell">4</div><div class="cal-cell">5</div>
+          <div class="cal-cell">6</div><div class="cal-cell in-week">7<div class="dots"><i style="background:var(--month)"></i><i style="background:var(--week)"></i></div></div>
+          <div class="cal-cell in-week">8</div><div class="cal-cell in-week">9</div><div class="cal-cell in-week">10</div>
+          <div class="cal-cell in-week">11</div><div class="cal-cell in-week">12</div><div class="cal-cell in-week">13</div>
+          <div class="cal-cell in-week today selected">14<div class="dots"><i style="background:var(--day)"></i></div></div>
+          <div class="cal-cell in-week">15</div><div class="cal-cell in-week">16</div><div class="cal-cell in-week">17</div>
+          <div class="cal-cell in-week">18</div><div class="cal-cell in-week">19</div><div class="cal-cell in-week">20</div>
+          <div class="cal-cell">21</div><div class="cal-cell">22</div><div class="cal-cell">23</div><div class="cal-cell">24</div>
+          <div class="cal-cell">25</div><div class="cal-cell">26</div><div class="cal-cell">27</div><div class="cal-cell">28</div>
+          <div class="cal-cell">29</div><div class="cal-cell">30</div><div class="cal-cell">31</div>
+        </div>
+        <p style="font-size:10px;color:var(--muted);margin-top:10px;text-align:center">보라 배경 = 이번 주(7/7~13) · 주 pill은 ②에서</p>
+      </div>
+    </div>
+    <ul class="anno" id="anno-1">
+      <li>달력 위: <strong>월간 목표 1줄</strong> (목표마다 색 점 = 그 목표 진행)</li>
+      <li>한 달 그리드만 — 주/일 상세는 아래로 내림 (달력 안에 글 안 씀)</li>
+    </ul>
+
+    <!-- Mock 2: Week -->
+    <div class="mock" id="mock-2">
+      <div class="mock-status"></div>
+      <div class="mock-body">
+        <div class="cal-head"><strong>7월</strong></div>
+        <div class="week-band">
+          <div class="week-pill"><div class="wl">W1</div><div class="wd">6/30</div></div>
+          <div class="week-pill active"><div class="wl">W2</div><div class="wd">7/7</div></div>
+          <div class="week-pill"><div class="wl">W3</div><div class="wd">7/14</div></div>
+          <div class="week-pill"><div class="wl">W4</div><div class="wd">7/21</div></div>
+          <div class="week-pill"><div class="wl">W5</div><div class="wd">7/28</div></div>
+        </div>
+        <div class="cal-grid" style="margin-bottom:12px">
+          <div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>
+          <div class="cal-cell in-week">7</div><div class="cal-cell in-week">8</div><div class="cal-cell in-week">9</div>
+          <div class="cal-cell in-week">10</div><div class="cal-cell in-week">11</div><div class="cal-cell in-week">12</div>
+          <div class="cal-cell in-week">13</div>
+        </div>
+        <div class="layer-card w">
+          <div class="layer-label"><i></i>주간 · 7/7 ~ 7/13</div>
+          <p>온보딩 완성 + 크래시 Top 5 제거</p>
+          <div class="sub">월간 “핵심 기능”에서 자동 제안 · 수정 가능</div>
+        </div>
+        <div class="layer-card m" style="opacity:.85">
+          <div class="layer-label"><i></i>월간 (참고)</div>
+          <p>7월: 핵심 기능 + TestFlight</p>
+        </div>
+      </div>
+    </div>
+    <ul class="anno" id="anno-2" style="display:none">
+      <li>날짜 탭 OR 주 pill 탭 → <strong>해당 주 전체</strong>가 달력에서 하이라이트</li>
+      <li>주간 목표 카드 1개 — “이번 주 끝나면 뭐가 달성?”</li>
+    </ul>
+
+    <!-- Mock 3: Day -->
+    <div class="mock" id="mock-3">
+      <div class="mock-status"></div>
+      <div class="mock-body">
+        <div class="cal-head">
+          <strong>오늘</strong>
+          <span style="font-size:12px;font-weight:700;padding:6px 10px;border-radius:999px;background:#f1f4f7">7월 14일</span>
+        </div>
+        <div class="cal-grid" style="max-width:280px;margin:0 auto 14px">
+          <div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>
+          <div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div>
+          <div class="cal-cell"></div><div class="cal-cell today selected">14</div>
+          <div class="cal-cell"></div><div class="cal-cell"></div>
+        </div>
+
+        <div class="layer-card m">
+          <div class="layer-label"><i></i>월간</div>
+          <p>7월: 핵심 기능 + TestFlight</p>
+        </div>
+        <div class="layer-card w">
+          <div class="layer-label"><i></i>주간 · W2</div>
+          <p>온보딩 + 크래시 제거</p>
+        </div>
+        <div class="layer-card d">
+          <div class="layer-label"><i></i>일간 · 오늘 3가지</div>
+          <div class="task"><div class="chk"></div><div><strong>크래시 로그 Top 5</strong><span>→ 주간 “크래시 제거”</span></div></div>
+          <div class="task"><div class="chk"></div><div><strong>온보딩 카피 확정</strong><span>→ 주간 “온보딩”</span></div></div>
+          <div class="task done"><div class="chk"></div><div><strong>TestFlight 빌드</strong><span>완료 · 달력 점 +1</span></div></div>
+        </div>
+      </div>
+    </div>
+    <ul class="anno" id="anno-3" style="display:none">
+      <li>날짜 1개 선택 → <strong>월·주·일 카드 스택</strong> (위에서 맥락, 아래에서 실행)</li>
+      <li>일간 체크 완료 → 그날 달력 칸에 색 점 (목표별)</li>
+    </ul>
+
+    <div class="compare">
+      <div class="compare-box bad">
+        <h4>❌ 피할 것</h4>
+        <p>달력 칸 안에 할 일 글씨 넣기 · 월/주/일 각각 별도 탭 3개 · 목표마다 달력 하나씩</p>
+      </div>
+      <div class="compare-box good">
+        <h4>✅ 추천</h4>
+        <p>달력 = 선택 + 점 · 아래 3-layer 카드 · 주 pill로 주간 전환 · AI는 월→주→일 초안만 채움</p>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:24px">데이터 관계 (구현 시)</p>
+    <pre style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;font-size:11px;overflow-x:auto;line-height:1.6;color:#3b4450">
+목표 (역산/산출물/루틴)
+  └─ 월간[]     "7월: ~"        ← 마감 역산 or 사용자 입력
+       └─ 주간[]  "W2: ~"       ← 해당 월의 주차 (자동 4~5개)
+            └─ 일간[] "7/14: ~"  ← 오늘 3개 (주간에서 파생)
+                 └─ 체크 → calendar[date][goalId] = done
+    </pre>
+  </div>
+
+  <script>
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".mock").forEach(m => m.classList.remove("active"));
+        document.querySelectorAll(".anno").forEach(a => a.style.display = "none");
+        tab.classList.add("active");
+        const id = tab.dataset.tab;
+        document.getElementById("mock-" + id).classList.add("active");
+        const anno = document.getElementById("anno-" + id);
+        if (anno) anno.style.display = "block";
+      });
+    });
+  </script>
+</body>
+</html>

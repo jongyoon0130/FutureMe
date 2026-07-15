@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { APP_NAME, APP_TAGLINE } from '../../lib/brand'
 import { formatListTime, type ProfileSummary } from '../../lib/storage'
 import { useAuth } from '../../contexts/AuthContext'
-import { ThemePicker } from '../theme/ThemePicker'
 import { FutureMeLogo } from '../brand/FutureMeLogo'
 import { SwipeableListRow } from './SwipeableListRow'
 
@@ -61,18 +60,13 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
           : null
 
   return (
-    <div className="h-full flex flex-col max-w-lg mx-auto bg-void">
-      <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center justify-center w-12 h-12 shrink-0">
-            <FutureMeLogo size={48} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-lg font-medium text-ink">{APP_NAME}</h1>
-            <p className="text-xs text-muted mt-0.5 truncate">{APP_TAGLINE}</p>
-          </div>
+    <div className="h-full flex flex-col max-w-[480px] mx-auto">
+      <header className="goal-nav sticky top-0 z-10">
+        <div className="goal-crumb min-w-0 flex-1">
+          <p className="goal-crumb-lv f">채팅</p>
+          <h1>{APP_NAME}</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {configured && user && (
             <div className="relative">
               <button
@@ -135,7 +129,7 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
           <button
             type="button"
             onClick={onCreateNew}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-border bg-surface-2 text-ink hover:border-accent/40 hover:bg-accent/5 transition-colors text-lg leading-none"
+            className="goal-nav-btn"
             title="미래의 나 추가"
           >
             +
@@ -156,18 +150,15 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
             5년 뒤 목표하는 나와 대화해보세요.
           </p>
           <div className="w-full max-w-xs space-y-3">
-            <button
-              type="button"
-              onClick={onCreateNew}
-              className="w-full py-4 rounded-2xl bg-accent text-surface font-medium hover:bg-accent-dim transition-colors shadow-sm shadow-accent/20"
-            >
+            <button type="button" onClick={onCreateNew} className="goal-cta">
               미래의 나 만들기
             </button>
             <button
               type="button"
               disabled={importStatus === 'loading'}
               onClick={() => importRef.current?.click()}
-              className="w-full py-4 rounded-2xl border border-border bg-surface-2 text-ink font-medium hover:border-accent/40 hover:bg-accent/5 transition-colors disabled:opacity-50"
+              className="goal-mode-card w-full"
+              style={{ alignItems: 'center', textAlign: 'center' }}
             >
               {importStatus === 'loading' ? '불러오는 중…' : '백업에서 불러오기 (.json)'}
             </button>
@@ -225,8 +216,6 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
           </ul>
         </>
       )}
-
-      <ThemePicker variant="compact" />
 
       <input
         ref={importRef}

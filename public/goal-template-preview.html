@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>FutureMe · Goal Home</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #14171c; --ink-2: #3b4450; --muted: #7a8494;
+      --line: #e8ecf1; --line-2: #d7dde6; --bg: #f4f6f8; --surface: #fff;
+      --accent: #0d8f86; --accent-soft: #e6f6f4;
+      --violet: #5b5fc7; --violet-soft: #eceefb;
+      --warn: #d4891a; --warn-soft: #fbf1e0;
+      --ok: #1a9a52; --ok-soft: #e5f7ec; --danger: #d64545;
+      --font: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
+      --display: "Syne", "Pretendard Variable", sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: var(--font); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+    button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
+    input, textarea { font: inherit; color: inherit; }
+    .app { min-height: 100%; display: flex; flex-direction: column; }
+    .view { display: none; flex: 1; min-height: 0; }
+    .view.active { display: flex; flex-direction: column; }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      width: 32px; height: 32px; border-radius: 10px;
+      background: linear-gradient(145deg, var(--accent), #0a6e8a);
+      display: grid; place-items: center; color: #fff;
+      box-shadow: 0 6px 16px rgba(13,143,134,.28);
+    }
+    .brand-mark svg { width: 16px; height: 16px; }
+    .brand strong { font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: -.02em; }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+    .ghost-btn, .primary-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 650;
+      transition: .15s;
+    }
+    .ghost-btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }
+    .ghost-btn:hover { background: var(--bg); }
+    .ghost-btn.active-edit { background: var(--accent-soft); border-color: rgba(13,143,134,.35); color: var(--accent); }
+    .primary-btn { background: var(--accent); color: #fff; }
+    .primary-btn:hover { filter: brightness(.95); }
+    .primary-btn.violet { background: var(--violet); }
+    .primary-btn.warn { background: var(--warn); }
+
+    /* Home */
+    .home-body {
+      flex: 1; display: grid; grid-template-columns: 340px 1fr; gap: 20px;
+      max-width: 1280px; width: 100%; margin: 0 auto; padding: 20px 24px 100px;
+    }
+    .side-panel {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 24px;
+      padding: 20px; height: fit-content; position: sticky; top: 78px;
+      box-shadow: 0 8px 28px rgba(20,23,28,.04);
+    }
+    .profile { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .avatar {
+      width: 44px; height: 44px; border-radius: 14px;
+      background: linear-gradient(145deg, #ffd7a8, #f0a878);
+      display: grid; place-items: center; font-size: 22px;
+    }
+    .profile h2 { font-size: 15px; font-weight: 700; }
+    .profile p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .goal-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .goal-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line);
+      font-size: 12px; font-weight: 650; color: var(--ink-2); background: #fafbfc;
+    }
+    .goal-chip.active { color: #fff; border-color: transparent; }
+    .goal-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .goal-chip.add { color: var(--muted); border-style: dashed; }
+    .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .cal-head strong { font-family: var(--display); font-size: 18px; font-weight: 700; }
+    .cal-nav { display: flex; gap: 4px; }
+    .cal-nav button {
+      width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line);
+      display: grid; place-items: center; color: var(--muted);
+    }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal-dow { text-align: center; font-size: 10px; font-weight: 700; color: var(--muted); padding-bottom: 4px; }
+    .cal-day {
+      aspect-ratio: 1; border-radius: 12px; background: #f1f4f7;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      border: 2px solid transparent;
+    }
+    .cal-day.empty { background: transparent; pointer-events: none; }
+    .cal-day .n { font-size: 11px; font-weight: 650; color: var(--muted); }
+    .cal-day.has .n { color: var(--ink); }
+    .cal-day.today { border-color: var(--accent); background: var(--accent-soft); }
+    .cal-day.selected { box-shadow: 0 0 0 2px rgba(13,143,134,.25); }
+    .cal-marks { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; max-width: 28px; }
+    .cal-marks i { width: 6px; height: 6px; border-radius: 2px; display: block; }
+    .side-note { margin-top: 16px; padding: 12px; border-radius: 14px; background: var(--bg); font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+    .side-note strong { color: var(--accent); }
+
+    .feed-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; padding: 0 4px; }
+    .feed-head h1 { font-family: var(--display); font-size: 28px; font-weight: 800; letter-spacing: -.03em; }
+    .feed-head p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .date-pill { font-size: 12px; font-weight: 700; padding: 8px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+    .feed-group { margin-bottom: 18px; }
+    .group-bar {
+      display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 7px 12px; border-radius: 999px; background: #eef1f5;
+      font-size: 13px; font-weight: 700; margin-bottom: 10px;
+    }
+    .group-bar .open-plan {
+      margin-left: 4px; font-size: 11px; font-weight: 700; color: var(--accent);
+      padding: 3px 8px; border-radius: 999px; background: #fff;
+    }
+    .type-tag { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 6px; }
+    .type-tag.back { background: var(--accent-soft); color: var(--accent); }
+    .type-tag.del { background: var(--violet-soft); color: var(--violet); }
+    .type-tag.rou { background: var(--warn-soft); color: var(--warn); }
+    .feed-card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+      padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(20,23,28,.03);
+    }
+    .feed-card:hover { border-color: var(--line-2); }
+    .feed-row { display: flex; align-items: flex-start; gap: 12px; }
+    .check-circle {
+      width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line-2);
+      flex-shrink: 0; display: grid; place-items: center;
+    }
+    .feed-card.done .check-circle { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .check-circle svg { width: 12px; height: 12px; opacity: 0; }
+    .feed-card.done .check-circle svg { opacity: 1; }
+    .feed-body strong { display: block; font-size: 14px; font-weight: 650; line-height: 1.4; }
+    .feed-card.done .feed-body strong { color: var(--muted); text-decoration: line-through; }
+    .feed-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .react {
+      display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px;
+      border-radius: 999px; background: #f3f5f8; font-size: 11px; font-weight: 650;
+    }
+    .empty-feed {
+      text-align: center; padding: 48px 20px; color: var(--muted);
+      background: var(--surface); border: 1px dashed var(--line-2); border-radius: 20px;
+    }
+    .fab {
+      position: fixed; right: 28px; bottom: 28px; z-index: 30;
+      width: 56px; height: 56px; border-radius: 18px;
+      background: linear-gradient(145deg, var(--accent), #067068); color: #fff;
+      display: grid; place-items: center; box-shadow: 0 14px 32px rgba(13,143,134,.4);
+    }
+    .fab svg { width: 24px; height: 24px; }
+
+    /* Picker */
+    .picker-wrap { flex: 1; max-width: 1040px; width: 100%; margin: 0 auto; padding: 28px 24px 80px; }
+    .picker-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 18px; }
+    .picker-back:hover { color: var(--ink); }
+    .picker-wrap h1 { font-family: var(--display); font-size: 32px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 8px; }
+    .picker-wrap .lead { font-size: 15px; color: var(--ink-2); line-height: 1.55; margin-bottom: 28px; max-width: 48ch; }
+    .type-cards { display: flex; flex-direction: column; gap: 16px; }
+    .type-card {
+      display: grid; grid-template-columns: 1fr minmax(280px, 340px); gap: 0;
+      background: var(--surface); border: 1.5px solid var(--line); border-radius: 22px;
+      overflow: hidden; text-align: left; transition: .18s;
+      box-shadow: 0 6px 20px rgba(20,23,28,.04);
+    }
+    .type-card:hover { border-color: var(--line-2); transform: translateY(-2px); box-shadow: 0 14px 36px rgba(20,23,28,.08); }
+    .type-copy { padding: 24px; display: flex; flex-direction: column; }
+    .type-copy .badge {
+      display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700;
+      letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+    }
+    .type-copy .badge i { width: 9px; height: 9px; border-radius: 50%; }
+    .type-copy h2 { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 8px; }
+    .type-copy .one-liner { font-size: 15px; font-weight: 650; line-height: 1.45; margin-bottom: 10px; }
+    .type-copy .examples { font-size: 13px; color: var(--muted); line-height: 1.45; margin-bottom: 16px; }
+    .type-copy .examples em { font-style: normal; color: var(--ink-2); font-weight: 600; }
+    .type-copy .choose {
+      margin-top: auto; align-self: flex-start;
+      padding: 10px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; color: #fff;
+    }
+    .type-copy .choose.back { background: var(--accent); }
+    .type-copy .choose.del { background: var(--violet); }
+    .type-copy .choose.rou { background: var(--warn); }
+
+    .type-preview {
+      background: linear-gradient(160deg, #eef2f6, #e4eaf1);
+      border-left: 1px solid var(--line); padding: 14px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .preview-label {
+      font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .shot {
+      flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px; box-shadow: 0 8px 20px rgba(20,23,28,.06); overflow: hidden;
+      min-height: 200px;
+    }
+    .shot-title { font-size: 12px; font-weight: 800; margin-bottom: 2px; letter-spacing: -.01em; }
+    .shot-meta { font-size: 10px; color: var(--muted); font-weight: 600; margin-bottom: 10px; }
+    .shot-row {
+      display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 8px;
+      background: #f5f7fa; margin-bottom: 5px; font-size: 11px; font-weight: 600; color: var(--ink-2);
+    }
+    .shot-row.on { background: var(--accent-soft); color: var(--accent); }
+    .shot-row.vd { background: var(--violet-soft); color: var(--violet); }
+    .shot-row.wn { background: var(--warn-soft); color: var(--warn); }
+    .shot-dot {
+      width: 12px; height: 12px; border-radius: 4px; border: 1.5px solid var(--line-2);
+      flex-shrink: 0; background: #fff;
+    }
+    .shot-row.on .shot-dot, .shot-row.vd .shot-dot { background: currentColor; border-color: currentColor; }
+    .shot-pipe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-bottom: 8px; }
+    .shot-pipe span {
+      text-align: center; font-size: 9px; font-weight: 750; padding: 6px 2px;
+      border-radius: 6px; background: #f0f2f6; color: var(--muted);
+    }
+    .shot-pipe span.cur { background: var(--violet); color: #fff; }
+    .shot-streak {
+      display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px;
+    }
+    .shot-streak b {
+      font-family: var(--display); font-size: 28px; font-weight: 800; color: var(--warn); letter-spacing: -.04em;
+    }
+    .shot-streak span { font-size: 10px; font-weight: 700; color: var(--muted); }
+    .shot-heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 8px; }
+    .shot-heat i { aspect-ratio: 1; border-radius: 3px; background: #eef1f5; }
+    .shot-heat i.a { background: rgba(212,137,26,.4); }
+    .shot-heat i.b { background: var(--warn); }
+    .shot-note { font-size: 10px; color: var(--muted); line-height: 1.4; margin-top: 6px; }
+
+    /* Planner */
+    .planner-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .planner-body { flex: 1; max-width: 720px; width: 100%; margin: 0 auto; padding: 28px 24px 100px; }
+    .mode-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 14px; border-radius: 14px; margin-bottom: 18px;
+      background: var(--accent-soft); border: 1px solid rgba(13,143,134,.2);
+      font-size: 13px; font-weight: 600; color: var(--accent);
+    }
+    .mode-banner.edit { background: #fff7e8; border-color: rgba(212,137,26,.25); color: var(--warn); }
+    .planner-hero { margin-bottom: 18px; }
+    .planner-hero .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    .title-input {
+      width: 100%; border: 1.5px dashed transparent; background: transparent;
+      font-family: var(--display); font-size: 28px; font-weight: 800; letter-spacing: -.03em;
+      line-height: 1.2; padding: 4px 6px; margin: 0 -6px 10px; border-radius: 10px;
+      outline: none; resize: none; min-height: 40px;
+    }
+    .editing .title-input, .title-input:focus {
+      border-color: var(--line-2); background: #fff; box-shadow: 0 0 0 3px rgba(13,143,134,.08);
+    }
+    .title-input::placeholder { color: #c0c6d0; }
+    .hero-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .field-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 650; padding: 6px 10px; border-radius: 999px;
+      background: var(--surface); border: 1px solid var(--line); color: var(--ink-2);
+    }
+    .field-pill input[type="date"] {
+      border: none; background: transparent; outline: none; font-size: 12px; font-weight: 650; color: var(--ink-2);
+    }
+    .editing .field-pill { border-style: dashed; background: #fff; }
+
+    .section {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
+      padding: 16px 18px; margin-bottom: 12px; box-shadow: 0 4px 14px rgba(20,23,28,.03);
+    }
+    .section-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+    .section-h h3 { font-size: 14px; font-weight: 750; }
+    .section-h .hint { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .tag { font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; background: #f1f4f7; color: var(--muted); }
+
+    .item-row {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 8px 10px; border-radius: 12px; background: #f6f8fa; margin-bottom: 6px;
+    }
+    .item-row.done { background: var(--ok-soft); }
+    .item-check {
+      width: 20px; height: 20px; border-radius: 7px; border: 1.5px solid var(--line-2);
+      background: #fff; flex-shrink: 0; margin-top: 2px; display: grid; place-items: center;
+    }
+    .item-row.done .item-check { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .item-check svg { width: 11px; height: 11px; opacity: 0; }
+    .item-row.done .item-check svg { opacity: 1; }
+    .item-input {
+      flex: 1; border: none; background: transparent; outline: none;
+      font-size: 13px; font-weight: 550; line-height: 1.4; padding: 2px 0;
+      resize: none; min-height: 22px;
+    }
+    .item-row.done .item-input { text-decoration: line-through; color: var(--muted); }
+    .item-input::placeholder { color: #b4bac4; }
+    .item-del {
+      opacity: 0; font-size: 16px; color: var(--muted); padding: 0 4px; line-height: 1;
+      transition: opacity .15s;
+    }
+    .editing .item-del, .item-row:hover .item-del { opacity: 1; }
+    .add-row {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 700; color: var(--accent); padding: 8px 4px;
+    }
+    .add-row:hover { text-decoration: underline; }
+
+    .scope { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .scope > div { border-radius: 14px; padding: 12px; min-height: 96px; }
+    .scope .will { background: var(--accent-soft); border: 1px solid rgba(13,143,134,.18); }
+    .scope .wont { background: #f3f5f8; border: 1px solid var(--line); }
+    .scope label {
+      display: block; font-size: 10px; font-weight: 750; letter-spacing: .05em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+    }
+    .scope .will label { color: var(--accent); }
+    .scope textarea {
+      width: 100%; border: none; background: transparent; outline: none; resize: none;
+      font-size: 13px; line-height: 1.45; font-weight: 550; min-height: 56px;
+    }
+    .scope textarea::placeholder { color: #a8b0bc; }
+
+    .phase { display: grid; grid-template-columns: 26px 1fr; gap: 10px; margin-bottom: 10px; }
+    .rail { display: flex; flex-direction: column; align-items: center; }
+    .node {
+      width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line-2);
+      background: #fff; display: grid; place-items: center; font-size: 10px; font-weight: 700; flex-shrink: 0;
+    }
+    .phase.current .node { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+    .line { flex: 1; width: 2px; background: var(--line-2); margin-top: 4px; min-height: 8px; }
+    .phase:last-child .line { display: none; }
+    .pbody { background: #f6f8fa; border-radius: 14px; padding: 12px; border: 1px solid transparent; }
+    .phase.current .pbody { background: #fff; border-color: rgba(13,143,134,.25); }
+    .phase-title-input {
+      width: 100%; border: none; background: transparent; outline: none;
+      font-size: 13px; font-weight: 750; margin-bottom: 8px;
+    }
+    .phase-title-input::placeholder { color: #b4bac4; }
+
+    .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 10px; }
+    .pipe { text-align: center; padding: 10px 4px; border-radius: 12px; background: #f3f5f8; cursor: pointer; }
+    .pipe.cur { background: var(--violet); color: #fff; }
+    .pipe b { display: block; font-family: var(--display); font-size: 14px; }
+    .pipe span { font-size: 9px; font-weight: 700; opacity: .75; }
+
+    .streak-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+    .streak-num { font-family: var(--display); font-size: 48px; font-weight: 800; letter-spacing: -.05em; color: var(--warn); line-height: 1; }
+    .heatmap { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 6px; }
+    .heat-day { aspect-ratio: 1; border-radius: 8px; background: #f1f4f7; cursor: pointer; }
+    .heat-day.l1 { background: rgba(212,137,26,.3); }
+    .heat-day.l2 { background: rgba(212,137,26,.55); }
+    .heat-day.l3 { background: var(--warn); }
+    .heat-labs { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 10px; }
+    .heat-labs span { text-align: center; font-size: 9px; font-weight: 700; color: var(--muted); }
+    .anchors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .anchor { padding: 12px; border-radius: 14px; background: #f6f8fa; }
+    .anchor .at { font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+    .anchor textarea {
+      width: 100%; border: none; background: transparent; outline: none; resize: none;
+      font-size: 13px; font-weight: 650; line-height: 1.35; min-height: 40px;
+    }
+    .field-block textarea, .field-block input[type="text"] {
+      width: 100%; border: 1px solid var(--line); background: #fafbfc; border-radius: 12px;
+      padding: 11px 12px; outline: none; font-size: 13px; line-height: 1.45;
+    }
+    .editing .field-block textarea, .editing .field-block input[type="text"] {
+      border-style: dashed; background: #fff;
+    }
+    .field-block textarea:focus, .field-block input:focus {
+      border-color: rgba(13,143,134,.4); box-shadow: 0 0 0 3px rgba(13,143,134,.08);
+    }
+    .field-block textarea { min-height: 72px; resize: vertical; }
+
+    .sticky-actions {
+      position: sticky; bottom: 0; margin: 20px -8px -20px; padding: 16px 8px 8px;
+      background: linear-gradient(transparent, var(--bg) 28%);
+      display: flex; gap: 8px;
+    }
+    .sticky-actions .cta {
+      flex: 1; padding: 15px; border-radius: 16px; color: #fff; font-size: 14px; font-weight: 750;
+      background: linear-gradient(135deg, var(--accent), #067068);
+      box-shadow: 0 10px 28px rgba(13,143,134,.32);
+    }
+    .sticky-actions .cta.violet { background: linear-gradient(135deg, var(--violet), #4347a8); box-shadow: 0 10px 28px rgba(91,95,199,.32); }
+    .sticky-actions .cta.warn { background: linear-gradient(135deg, var(--warn), #a85a10); box-shadow: 0 10px 28px rgba(212,137,26,.32); }
+    .sticky-actions .secondary {
+      padding: 15px 16px; border-radius: 16px; border: 1px solid var(--line);
+      background: #fff; font-size: 13px; font-weight: 700; color: var(--ink-2);
+    }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(16px);
+      background: var(--ink); color: #fff; font-size: 13px; font-weight: 650;
+      padding: 12px 18px; border-radius: 999px; opacity: 0; pointer-events: none;
+      transition: .28s; z-index: 50; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 900px) {
+      .home-body { grid-template-columns: 1fr; }
+      .side-panel { position: static; }
+      .type-card { grid-template-columns: 1fr; }
+      .type-preview { border-left: none; border-top: 1px solid var(--line); }
+      .scope, .anchors { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- HOME -->
+    <div class="view active" id="view-home">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg></div>
+          <strong>FutureMe</strong>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="ghost-btn" id="btnGoalsList">목표 목록</button>
+        </div>
+      </header>
+      <div class="home-body">
+        <aside class="side-panel">
+          <div class="profile">
+            <div class="avatar">🐻</div>
+            <div><h2>나의 목표</h2><p id="profileSub">오늘 할 일 · 진행 중</p></div>
+          </div>
+          <div class="goal-chips" id="goalChips"></div>
+          <div class="cal-head">
+            <strong id="calTitle">2026년 7월</strong>
+            <div class="cal-nav">
+              <button type="button" id="calPrev">‹</button>
+              <button type="button" id="calNext">›</button>
+            </div>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="side-note">날짜 색 점 = <strong>목표별 진행</strong>. 오른쪽에서 오늘 할 일을 체크하세요.</div>
+        </aside>
+        <main>
+          <div class="feed-head">
+            <div><h1>오늘</h1><p id="feedSub">선택한 날짜의 목표 · 할 일</p></div>
+            <div class="date-pill" id="datePill">7월 14일</div>
+          </div>
+          <div id="feedList"></div>
+        </main>
+      </div>
+      <button type="button" class="fab" id="fabAdd" aria-label="새 목표">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+
+    <!-- PICK -->
+    <div class="view" id="view-pick">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg></div>
+          <strong>FutureMe</strong>
+        </div>
+      </header>
+      <div class="picker-wrap">
+        <button type="button" class="picker-back" id="pickBack">← 홈으로</button>
+        <h1>어떤 목표인가요?</h1>
+        <p class="lead">한 줄 설명과 오른쪽 <strong>실제 화면 예시</strong>를 보고 고르세요. 고르면 빈 플래너가 열리고, 직접 채울 수 있어요.</p>
+
+        <div class="type-cards">
+          <button type="button" class="type-card" data-type="backplan">
+            <div class="type-copy">
+              <div class="badge"><i style="background:var(--accent)"></i>역산 플래너</div>
+              <h2>날짜가 정해진 목표</h2>
+              <p class="one-liner">“○월 ○일까지 끝내야 해”라면 여기</p>
+              <p class="examples">예: <em>앱 출시 · 이직 · 시험 · 런칭</em></p>
+              <span class="choose back">이 플래너로 새 목표 만들기 →</span>
+            </div>
+            <div class="type-preview">
+              <div class="preview-label">안에서 이렇게 보여요</div>
+              <div class="shot">
+                <div class="shot-title">iOS 앱 스토어 첫 출시</div>
+                <div class="shot-meta">D-63 · 마감 09/15 · 진행 34%</div>
+                <div class="shot-row on"><span class="shot-dot"></span>Phase 1 · 핵심 기능 완성</div>
+                <div class="shot-row"><span class="shot-dot"></span>Phase 2 · 스토어 메타</div>
+                <div class="shot-row"><span class="shot-dot"></span>오늘: 크래시 로그 Top 5</div>
+                <p class="shot-note">마감 ← 페이즈 ← 주간 ← 오늘 할 일</p>
+              </div>
+            </div>
+          </button>
+
+          <button type="button" class="type-card" data-type="deliverable">
+            <div class="type-copy">
+              <div class="badge"><i style="background:var(--violet)"></i>산출물형</div>
+              <h2>만들어서 제출할 결과물</h2>
+              <p class="one-liner">“완성본을 내야 해”라면 여기</p>
+              <p class="examples">예: <em>보고서 · 포트폴리오 · 발표 슬라이드 · 영상</em></p>
+              <span class="choose del">이 플래너로 새 목표 만들기 →</span>
+            </div>
+            <div class="type-preview">
+              <div class="preview-label">안에서 이렇게 보여요</div>
+              <div class="shot">
+                <div class="shot-title">분기 IR 슬라이드</div>
+                <div class="shot-meta">목차 → 초안 → 리뷰 → 최종</div>
+                <div class="shot-pipe">
+                  <span>목차</span><span class="cur">초안</span><span>리뷰</span><span>최종</span>
+                </div>
+                <div class="shot-row vd"><span class="shot-dot"></span>01 문제·기회</div>
+                <div class="shot-row"><span class="shot-dot"></span>02 이번 분기 성과</div>
+                <div class="shot-row"><span class="shot-dot"></span>피드백: 지표에 전년비 추가</div>
+                <p class="shot-note">결과물 파이프라인 + 목차 + 피드백 로그</p>
+              </div>
+            </div>
+          </button>
+
+          <button type="button" class="type-card" data-type="routine">
+            <div class="type-copy">
+              <div class="badge"><i style="background:var(--warn)"></i>루틴형</div>
+              <h2>매일·매주 반복할 습관</h2>
+              <p class="one-liner">“꾸준히 쌓고 싶어”라면 여기</p>
+              <p class="examples">예: <em>운동 · 공부 · 글쓰기 · 수면</em></p>
+              <span class="choose rou">이 플래너로 새 목표 만들기 →</span>
+            </div>
+            <div class="type-preview">
+              <div class="preview-label">안에서 이렇게 보여요</div>
+              <div class="shot">
+                <div class="shot-title">매일 아침 글쓰기</div>
+                <div class="shot-streak"><b>12</b><span>일 연속 · 이번 달 78%</span></div>
+                <div class="shot-heat">
+                  <i class="b"></i><i class="b"></i><i class="a"></i><i class="b"></i><i></i><i class="a"></i><i class="b"></i>
+                  <i class="b"></i><i class="a"></i><i class="b"></i><i class="b"></i><i class="a"></i><i></i><i class="b"></i>
+                </div>
+                <div class="shot-row wn"><span class="shot-dot"></span>오늘: 타이머 10분 켜고 쓰기</div>
+                <p class="shot-note">스트릭 · 히트맵 · 습관 앵커 · 주간 회고</p>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLANNER -->
+    <div class="view" id="view-planner">
+      <header class="planner-top">
+        <button type="button" class="ghost-btn" id="plannerBack">← 홈</button>
+        <div class="top-actions">
+          <button type="button" class="ghost-btn" id="btnToggleEdit">수정하기</button>
+          <button type="button" class="ghost-btn" id="plannerToPick">유형 다시 고르기</button>
+        </div>
+      </header>
+      <div class="planner-body" id="plannerBody"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>`;
+    const uid = () => crypto.randomUUID();
+    const COLORS = { backplan: "#0d8f86", deliverable: "#5b5fc7", routine: "#d4891a" };
+    const EMOJIS = { backplan: "🚀", deliverable: "📑", routine: "✍️" };
+
+    let GOALS = [
+      {
+        id: "g1", type: "backplan", emoji: "🚀", color: "#0d8f86",
+        title: "iOS 앱 스토어 첫 출시", deadline: "2026-09-15",
+        plan: null,
+        today: [
+          { id: "t1", text: "크래시 로그 Top 5 정리", done: false },
+          { id: "t2", text: "온보딩 카피 확정", done: false },
+          { id: "t3", text: "TestFlight 빌드 올리기", done: true },
+        ],
+      },
+      {
+        id: "g2", type: "deliverable", emoji: "📑", color: "#5b5fc7",
+        title: "분기 IR 슬라이드", deadline: "2026-07-28",
+        plan: null,
+        today: [
+          { id: "t4", text: "리드 피드백 반영", done: false },
+          { id: "t5", text: "Ask 금액 범위 확정", done: true },
+        ],
+      },
+      {
+        id: "g3", type: "routine", emoji: "✍️", color: "#d4891a",
+        title: "매일 아침 글쓰기", deadline: null,
+        plan: null,
+        today: [
+          { id: "t6", text: "타이머 10분 켜고 쓰기", done: false },
+          { id: "t7", text: "어제 한 줄 이어쓰기", done: false },
+        ],
+      },
+    ];
+
+    function blankPlan(type) {
+      if (type === "backplan") {
+        return {
+          type, title: "", deadline: "",
+          criteria: [{ id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }],
+          will: "", wont: "",
+          phases: [
+            { id: uid(), title: "준비", tasks: [{ id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }] },
+            { id: uid(), title: "실행", tasks: [{ id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }] },
+            { id: uid(), title: "마무리", tasks: [{ id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }] },
+          ],
+          today: [{ id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }],
+          risks: [{ id: uid(), text: "", done: false }],
+          buffer: "",
+        };
+      }
+      if (type === "deliverable") {
+        return {
+          type, title: "", deadline: "", format: "",
+          pipeIdx: 0,
+          criteria: [{ id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }],
+          outline: [{ id: uid(), text: "" }, { id: uid(), text: "" }, { id: uid(), text: "" }],
+          review: [{ id: uid(), text: "셀프 리뷰", done: false }, { id: uid(), text: "수정 반영", done: false }],
+          feedback: [{ id: uid(), text: "" }],
+          final: [{ id: uid(), text: "최종본 저장", done: false }, { id: uid(), text: "제출·공유", done: false }],
+        };
+      }
+      return {
+        type, title: "", outcome: "", weekGoal: "",
+        streak: 0,
+        heat: Array(28).fill(0),
+        actions: [{ id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }, { id: uid(), text: "", done: false }],
+        morning: "", evening: "", reflect: "",
+      };
+    }
+
+    let state = {
+      view: "home",
+      calYear: 2026, calMonth: 6, selectedDay: 14,
+      filterGoal: "all",
+      editing: true,
+      draft: null,
+      editingGoalId: null,
+    };
+
+    const toastEl = document.getElementById("toast");
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add("show");
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => toastEl.classList.remove("show"), 1600);
+    }
+
+    function showView(name) {
+      state.view = name;
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      document.getElementById("view-" + name).classList.add("active");
+      window.scrollTo(0, 0);
+    }
+
+    function typeLabel(t) { return t === "backplan" ? "역산" : t === "deliverable" ? "산출물" : "루틴"; }
+    function typeClass(t) { return t === "backplan" ? "back" : t === "deliverable" ? "del" : "rou"; }
+
+    function activityForDay(day) {
+      const map = {
+        1: [["#0d8f86", true]], 2: [["#0d8f86", true], ["#d4891a", true]],
+        7: [["#0d8f86", true], ["#d4891a", true], ["#5b5fc7", true]],
+        10: [["#5b5fc7", true], ["#d4891a", true]],
+        12: [["#d4891a", true], ["#5b5fc7", true]],
+        13: [["#0d8f86", true], ["#d4891a", true]],
+        14: GOALS.map(g => [g.color, (g.today || []).every(t => t.done) && (g.today || []).length > 0]),
+      };
+      return map[day] || [];
+    }
+
+    function renderChips() {
+      const el = document.getElementById("goalChips");
+      el.innerHTML = `
+        <button type="button" class="goal-chip ${state.filterGoal === "all" ? "active" : ""}" data-g="all"
+          style="${state.filterGoal === "all" ? "background:#14171c" : ""}">전체</button>
+        ${GOALS.map(g => `
+          <button type="button" class="goal-chip ${state.filterGoal === g.id ? "active" : ""}" data-g="${g.id}"
+            style="${state.filterGoal === g.id ? `background:${g.color};border-color:${g.color}` : ""}">
+            <i class="dot" style="background:${g.color}"></i>${g.emoji} ${g.title.slice(0, 10)}${g.title.length > 10 ? "…" : ""}
+          </button>`).join("")}
+        <button type="button" class="goal-chip add" id="chipAdd">+ 새 목표</button>
+      `;
+      el.querySelectorAll("[data-g]").forEach(btn => btn.addEventListener("click", () => {
+        state.filterGoal = btn.dataset.g; renderHome();
+      }));
+      document.getElementById("chipAdd").addEventListener("click", () => showView("pick"));
+    }
+
+    function renderCalendar() {
+      const y = state.calYear, m = state.calMonth;
+      document.getElementById("calTitle").textContent = `${y}년 ${m + 1}월`;
+      const startDow = new Date(y, m, 1).getDay();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      let html = ["일","월","화","수","목","금","토"].map(d => `<div class="cal-dow">${d}</div>`).join("");
+      for (let i = 0; i < startDow; i++) html += `<div class="cal-day empty"></div>`;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const acts = activityForDay(d);
+        html += `<button type="button" class="cal-day ${acts.length ? "has" : ""} ${d === 14 ? "today" : ""} ${d === state.selectedDay ? "selected" : ""}" data-day="${d}">
+          <span class="n">${d}</span>
+          <span class="cal-marks">${acts.map(a => `<i style="background:${a[0]};opacity:${a[1]?1:.35}"></i>`).join("")}</span>
+        </button>`;
+      }
+      const grid = document.getElementById("calGrid");
+      grid.innerHTML = html;
+      grid.querySelectorAll("[data-day]").forEach(btn => btn.addEventListener("click", () => {
+        state.selectedDay = Number(btn.dataset.day); renderHome();
+      }));
+    }
+
+    function renderFeed() {
+      const goals = state.filterGoal === "all" ? GOALS : GOALS.filter(g => g.id === state.filterGoal);
+      const isToday = state.selectedDay === 14;
+      document.getElementById("datePill").textContent = `7월 ${state.selectedDay}일`;
+      document.getElementById("feedSub").textContent = isToday ? "오늘의 목표 · 할 일을 체크하세요" : `${state.selectedDay}일의 기록`;
+      const left = GOALS.flatMap(g => g.today || []).filter(t => !t.done).length;
+      document.getElementById("profileSub").textContent = `진행 중 ${GOALS.length}개 · 오늘 남은 일 ${left}개`;
+
+      const list = document.getElementById("feedList");
+      if (!isToday) {
+        list.innerHTML = `<div class="empty-feed"><p>${state.selectedDay}일 기록</p><span>데모는 오늘(14일) 피드 중심이에요.</span></div>`;
+        return;
+      }
+      if (!goals.length) {
+        list.innerHTML = `<div class="empty-feed"><p>목표가 없어요</p><span>+ 버튼으로 새 목표를 만들어보세요.</span></div>`;
+        return;
+      }
+      list.innerHTML = goals.map(g => `
+        <div class="feed-group">
+          <div class="group-bar">
+            <span>${g.emoji}</span>${g.title || "제목 없음"}
+            <span class="type-tag ${typeClass(g.type)}">${typeLabel(g.type)}</span>
+            <button type="button" class="open-plan" data-edit="${g.id}">플래너 수정</button>
+          </div>
+          ${(g.today || []).length ? g.today.map(t => `
+            <div class="feed-card ${t.done ? "done" : ""}" data-goal="${g.id}" data-task="${t.id}">
+              <div class="feed-row">
+                <div class="check-circle">${CHECK}</div>
+                <div class="feed-body"><strong>${t.text || "(비어 있음)"}</strong>
+                  <div class="feed-meta"><span class="react" style="color:var(--muted)">${g.deadline ? "마감 " + g.deadline : "루틴"}</span></div>
+                </div>
+              </div>
+            </div>`).join("") : `<div class="empty-feed" style="padding:20px"><span>오늘 할 일이 아직 없어요. 플래너에서 추가하세요.</span></div>`}
+        </div>`).join("");
+
+      list.querySelectorAll(".feed-card").forEach(card => {
+        card.addEventListener("click", () => {
+          const g = GOALS.find(x => x.id === card.dataset.goal);
+          const t = g.today.find(x => x.id === card.dataset.task);
+          t.done = !t.done; renderHome(); toast(t.done ? "완료!" : "다시 열었어요");
+        });
+      });
+      list.querySelectorAll("[data-edit]").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openExisting(btn.dataset.edit);
+        });
+      });
+    }
+
+    function renderHome() { renderChips(); renderCalendar(); renderFeed(); }
+
+    function syncDraftFromDOM() {
+      const p = state.draft; if (!p) return;
+      const title = document.getElementById("planTitle");
+      if (title) p.title = title.value.trim();
+      const deadline = document.getElementById("planDeadline");
+      if (deadline) p.deadline = deadline.value;
+
+      if (p.type === "backplan") {
+        p.will = document.getElementById("planWill")?.value || "";
+        p.wont = document.getElementById("planWont")?.value || "";
+        p.buffer = document.getElementById("planBuffer")?.value || "";
+        p.criteria = [...document.querySelectorAll("[data-list=criteria] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+        }));
+        p.today = [...document.querySelectorAll("[data-list=today] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+        }));
+        p.risks = [...document.querySelectorAll("[data-list=risks] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+        }));
+        p.phases = [...document.querySelectorAll("[data-phase]")].map(block => ({
+          id: block.dataset.phase,
+          title: block.querySelector(".phase-title-input").value,
+          tasks: [...block.querySelectorAll(".item-row")].map(row => ({
+            id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+          })),
+        }));
+      }
+      if (p.type === "deliverable") {
+        p.format = document.getElementById("planFormat")?.value || "";
+        p.criteria = [...document.querySelectorAll("[data-list=criteria] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+        }));
+        p.outline = [...document.querySelectorAll("[data-list=outline] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value,
+        }));
+        p.review = [...document.querySelectorAll("[data-list=review] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+        }));
+        p.feedback = [...document.querySelectorAll("[data-list=feedback] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value,
+        }));
+        p.final = [...document.querySelectorAll("[data-list=final] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+        }));
+      }
+      if (p.type === "routine") {
+        p.outcome = document.getElementById("planOutcome")?.value || "";
+        p.weekGoal = document.getElementById("planWeekGoal")?.value || "";
+        p.morning = document.getElementById("planMorning")?.value || "";
+        p.evening = document.getElementById("planEvening")?.value || "";
+        p.reflect = document.getElementById("planReflect")?.value || "";
+        p.actions = [...document.querySelectorAll("[data-list=actions] .item-row")].map(row => ({
+          id: row.dataset.id, text: row.querySelector(".item-input").value, done: row.classList.contains("done"),
+        }));
+      }
+    }
+
+    function listHTML(listKey, items, { checkable = true, placeholder = "입력하세요" } = {}) {
+      return `
+        <div data-list="${listKey}">
+          ${items.map(it => `
+            <div class="item-row ${it.done ? "done" : ""}" data-id="${it.id}">
+              ${checkable ? `<button type="button" class="item-check" data-toggle>${CHECK}</button>` : `<span style="width:8px"></span>`}
+              <textarea class="item-input" rows="1" placeholder="${placeholder}">${it.text || ""}</textarea>
+              <button type="button" class="item-del" data-del title="삭제">×</button>
+            </div>`).join("")}
+          <button type="button" class="add-row" data-add="${listKey}">+ 항목 추가</button>
+        </div>`;
+    }
+
+    function autosize(el) {
+      el.style.height = "auto";
+      el.style.height = Math.max(22, el.scrollHeight) + "px";
+    }
+
+    function bindPlannerInteractions() {
+      const body = document.getElementById("plannerBody");
+      body.classList.toggle("editing", state.editing);
+      document.getElementById("btnToggleEdit").textContent = state.editing ? "수정 완료" : "수정하기";
+      document.getElementById("btnToggleEdit").classList.toggle("active-edit", state.editing);
+
+      body.querySelectorAll(".item-input, .title-input, .phase-title-input, .field-block textarea, .field-block input, .scope textarea, .anchor textarea").forEach(el => {
+        if (el.tagName === "TEXTAREA") autosize(el);
+        el.addEventListener("input", () => {
+          if (el.tagName === "TEXTAREA") autosize(el);
+          syncDraftFromDOM();
+        });
+      });
+
+      body.querySelectorAll("[data-toggle]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          btn.closest(".item-row").classList.toggle("done");
+          syncDraftFromDOM();
+        });
+      });
+
+      body.querySelectorAll("[data-del]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const row = btn.closest(".item-row");
+          const list = row.parentElement;
+          row.remove();
+          if (!list.querySelector(".item-row")) {
+            // keep at least empty add button
+          }
+          syncDraftFromDOM();
+        });
+      });
+
+      body.querySelectorAll("[data-add]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          syncDraftFromDOM();
+          const key = btn.dataset.add;
+          const p = state.draft;
+          const item = { id: uid(), text: "", done: false };
+          if (key === "criteria") p.criteria.push(item);
+          else if (key === "today") p.today.push(item);
+          else if (key === "risks") p.risks.push(item);
+          else if (key === "outline") p.outline.push({ id: uid(), text: "" });
+          else if (key === "review") p.review.push(item);
+          else if (key === "feedback") p.feedback.push({ id: uid(), text: "" });
+          else if (key === "final") p.final.push(item);
+          else if (key === "actions") p.actions.push(item);
+          else if (key.startsWith("phase-")) {
+            const phase = p.phases.find(ph => ph.id === key.slice(6));
+            if (phase) phase.tasks.push(item);
+          }
+          renderPlanner();
+          toast("항목 추가됨");
+        });
+      });
+
+      body.querySelectorAll(".pipe").forEach(el => {
+        el.addEventListener("click", () => {
+          if (!state.editing && state.draft.type === "deliverable") {
+            state.draft.pipeIdx = Number(el.dataset.i);
+            renderPlanner();
+          } else if (state.draft.type === "deliverable") {
+            state.draft.pipeIdx = Number(el.dataset.i);
+            renderPlanner();
+          }
+        });
+      });
+
+      body.querySelectorAll(".heat-day").forEach((el, i) => {
+        el.addEventListener("click", () => {
+          const h = state.draft.heat;
+          h[i] = (h[i] + 1) % 4;
+          el.className = "heat-day" + (h[i] ? " l" + h[i] : "");
+          if (h[i]) state.draft.streak = Math.max(state.draft.streak, 1);
+          const num = document.getElementById("streakNum");
+          if (num) num.textContent = String(state.draft.streak || h.filter(Boolean).length);
+        });
+      });
+
+      document.getElementById("btnSavePlan")?.addEventListener("click", savePlan);
+      document.getElementById("btnFillSample")?.addEventListener("click", () => {
+        fillSample();
+        renderPlanner();
+        toast("예시로 채웠어요 · 고쳐서 저장하세요");
+      });
+    }
+
+    function fillSample() {
+      const t = state.draft.type;
+      if (t === "backplan") {
+        Object.assign(state.draft, {
+          title: "iOS 앱 스토어 첫 출시",
+          deadline: "2026-09-15",
+          will: "MVP 온보딩 · 목표 생성 · 일일 체크인",
+          wont: "웹 버전 · 소셜 피드 · 유료 결제",
+          buffer: "심사 버퍼 5일 · 9/10 제출 목표",
+          criteria: [
+            { id: uid(), text: "TestFlight 테스터 10명 피드백 반영", done: true },
+            { id: uid(), text: "App Store 심사 통과 · 공개", done: false },
+          ],
+          today: [
+            { id: uid(), text: "크래시 로그 Top 5 정리", done: false },
+            { id: uid(), text: "온보딩 카피 확정", done: false },
+            { id: uid(), text: "TestFlight 빌드 올리기", done: true },
+          ],
+          risks: [{ id: uid(), text: "심사 리젝 → 가이드라인 체크 + 3~5일 버퍼", done: false }],
+          phases: [
+            { id: uid(), title: "배포 루틴 세팅", tasks: [{ id: uid(), text: "빌드 루틴", done: true }, { id: uid(), text: "TestFlight 준비", done: true }] },
+            { id: uid(), title: "핵심 기능 완성", tasks: [{ id: uid(), text: "핵심 플로우 E2E", done: false }, { id: uid(), text: "크래시 제거", done: false }] },
+            { id: uid(), title: "제출·출시", tasks: [{ id: uid(), text: "빌드 제출", done: false }, { id: uid(), text: "출시 모니터링", done: false }] },
+          ],
+        });
+      } else if (t === "deliverable") {
+        Object.assign(state.draft, {
+          title: "분기 IR 슬라이드",
+          deadline: "2026-07-28",
+          format: "슬라이드 12장",
+          pipeIdx: 2,
+          criteria: [
+            { id: uid(), text: "핵심 메시지 3개 명확", done: true },
+            { id: uid(), text: "최종본 PDF 확정", done: false },
+          ],
+          outline: [
+            { id: uid(), text: "문제·기회" },
+            { id: uid(), text: "이번 분기 성과" },
+            { id: uid(), text: "Ask" },
+          ],
+          review: [
+            { id: uid(), text: "리드 피드백 받기", done: true },
+            { id: uid(), text: "수정 반영", done: false },
+          ],
+          feedback: [{ id: uid(), text: "7/12 민수 — 지표에 전년 대비 추가" }],
+          final: [
+            { id: uid(), text: "최종본 저장", done: false },
+            { id: uid(), text: "공유 링크 발송", done: false },
+          ],
+        });
+      } else {
+        Object.assign(state.draft, {
+          title: "매일 아침 글쓰기",
+          outcome: "3개월 뒤, 부담 없이 20분 쓰는 사람",
+          weekGoal: "이번 주 5일 · 최소 10분",
+          streak: 12,
+          heat: [2,3,3,1,3,0,2, 3,2,3,3,1,0,3, 2,3,3,2,3,1,2, 3,2,0,0,0,0,0],
+          actions: [
+            { id: uid(), text: "타이머 10분 켜고 쓰기", done: false },
+            { id: uid(), text: "어제 한 줄 이어쓰기", done: false },
+            { id: uid(), text: "폰은 다른 방", done: true },
+          ],
+          morning: "기상 후 · 커피 내리기 전",
+          evening: "못 했으면 잠들기 전 5분 버전",
+          reflect: "",
+        });
+      }
+    }
+
+    function renderBackplan(p) {
+      return `
+        <div class="mode-banner ${state.editing ? "edit" : ""}">
+          <span>${state.editing ? "✏️ 수정 모드 — 칸을 직접 채우세요" : "👁 보기 모드 — 오른쪽 위 ‘수정하기’로 편집"}</span>
+          <button type="button" class="ghost-btn" id="btnFillSample" style="padding:6px 10px;font-size:12px">예시로 채우기</button>
+        </div>
+        <div class="planner-hero">
+          <div class="eyebrow">역산 플래너 · 날짜가 정해진 목표</div>
+          <textarea class="title-input" id="planTitle" rows="1" placeholder="목표를 한 문장으로 적어보세요" ${state.editing ? "" : "readonly"}>${p.title}</textarea>
+          <div class="hero-row">
+            <label class="field-pill">마감
+              <input type="date" id="planDeadline" value="${p.deadline || ""}" ${state.editing ? "" : "readonly"} />
+            </label>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>성공 기준</h3><p class="hint">끝나면 “됐다”고 말할 수 있는 것</p></div><span class="tag">측정</span></div>
+          ${listHTML("criteria", p.criteria, { placeholder: "예: 심사 통과 · 출시" })}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>범위</h3><p class="hint">팽창 방지</p></div></div>
+          <div class="scope">
+            <div class="will"><label>Will do</label><textarea id="planWill" placeholder="꼭 할 것" ${state.editing ? "" : "readonly"}>${p.will}</textarea></div>
+            <div class="wont"><label>Won't do</label><textarea id="planWont" placeholder="안 할 것" ${state.editing ? "" : "readonly"}>${p.wont}</textarea></div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>로드맵 (Phase)</h3><p class="hint">마감에서 거꾸로 쪼갠 단계</p></div></div>
+          ${p.phases.map((ph, i) => `
+            <div class="phase ${i === 1 ? "current" : ""}" data-phase="${ph.id}">
+              <div class="rail"><div class="node">${i}</div><div class="line"></div></div>
+              <div class="pbody">
+                <input class="phase-title-input" value="${ph.title}" placeholder="Phase 이름" ${state.editing ? "" : "readonly"} />
+                <div data-list="phase-${ph.id}">
+                  ${ph.tasks.map(tk => `
+                    <div class="item-row ${tk.done ? "done" : ""}" data-id="${tk.id}">
+                      <button type="button" class="item-check" data-toggle>${CHECK}</button>
+                      <textarea class="item-input" rows="1" placeholder="할 일">${tk.text}</textarea>
+                      <button type="button" class="item-del" data-del>×</button>
+                    </div>`).join("")}
+                  <button type="button" class="add-row" data-add="phase-${ph.id}">+ 항목 추가</button>
+                </div>
+              </div>
+            </div>`).join("")}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>오늘 할 일</h3><p class="hint">우선순위 높은 것만</p></div><span class="tag">Today</span></div>
+          ${listHTML("today", p.today, { placeholder: "오늘 할 일" })}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>리스크 & 버퍼</h3></div></div>
+          ${listHTML("risks", p.risks, { placeholder: "리스크 → 플랜 B" })}
+          <div class="field-block" style="margin-top:8px">
+            <textarea id="planBuffer" placeholder="버퍼 (예: 마감 3일 전 제출)" ${state.editing ? "" : "readonly"}>${p.buffer || ""}</textarea>
+          </div>
+        </div>
+        <div class="sticky-actions">
+          <button type="button" class="secondary" id="plannerToPick2">유형 변경</button>
+          <button type="button" class="cta" id="btnSavePlan">${state.editingGoalId ? "수정 저장" : "목표 저장하고 홈으로"}</button>
+        </div>`;
+    }
+
+    function renderDeliverable(p) {
+      const pipes = ["목차", "초안", "리뷰", "최종"];
+      return `
+        <div class="mode-banner ${state.editing ? "edit" : ""}">
+          <span>${state.editing ? "✏️ 수정 모드 — 결과물을 직접 채워 넣으세요" : "👁 보기 모드"}</span>
+          <button type="button" class="ghost-btn" id="btnFillSample" style="padding:6px 10px;font-size:12px">예시로 채우기</button>
+        </div>
+        <div class="planner-hero">
+          <div class="eyebrow">산출물형 · 만들어서 제출할 결과물</div>
+          <textarea class="title-input" id="planTitle" rows="1" placeholder="결과물 이름 (예: 분기 IR 슬라이드)" ${state.editing ? "" : "readonly"}>${p.title}</textarea>
+          <div class="hero-row">
+            <label class="field-pill">마감 <input type="date" id="planDeadline" value="${p.deadline || ""}" ${state.editing ? "" : "readonly"} /></label>
+            <label class="field-pill">형태
+              <input type="text" id="planFormat" value="${p.format || ""}" placeholder="슬라이드 · 문서 …" style="border:none;background:transparent;width:110px;font-size:12px;font-weight:650;outline:none" ${state.editing ? "" : "readonly"} />
+            </label>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>제작 파이프라인</h3><p class="hint">지금 단계를 탭하세요</p></div></div>
+          <div class="pipeline">
+            ${pipes.map((x, i) => `<div class="pipe ${i === p.pipeIdx ? "cur" : ""}" data-i="${i}"><b>${i + 1}</b><span>${x}</span></div>`).join("")}
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>성공 기준</h3></div></div>
+          ${listHTML("criteria", p.criteria, { placeholder: "완료 기준" })}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>목차 초안</h3><p class="hint">섹션 제목만</p></div></div>
+          ${listHTML("outline", p.outline, { checkable: false, placeholder: "섹션 제목" })}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>리뷰</h3></div></div>
+          ${listHTML("review", p.review, { placeholder: "리뷰 할 일" })}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>피드백 로그</h3></div></div>
+          ${listHTML("feedback", p.feedback, { checkable: false, placeholder: "날짜 · 누구 · 무엇을 바꿨는지" })}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>최종</h3></div></div>
+          ${listHTML("final", p.final, { placeholder: "최종 체크" })}
+        </div>
+        <div class="sticky-actions">
+          <button type="button" class="secondary" id="plannerToPick2">유형 변경</button>
+          <button type="button" class="cta violet" id="btnSavePlan">${state.editingGoalId ? "수정 저장" : "목표 저장하고 홈으로"}</button>
+        </div>`;
+    }
+
+    function renderRoutine(p) {
+      const days = ["월","화","수","목","금","토","일"];
+      return `
+        <div class="mode-banner ${state.editing ? "edit" : ""}">
+          <span>${state.editing ? "✏️ 수정 모드 — 습관을 직접 설정하세요" : "👁 보기 모드"}</span>
+          <button type="button" class="ghost-btn" id="btnFillSample" style="padding:6px 10px;font-size:12px">예시로 채우기</button>
+        </div>
+        <div class="planner-hero">
+          <div class="eyebrow">루틴형 · 매일·매주 반복</div>
+          <textarea class="title-input" id="planTitle" rows="1" placeholder="습관 이름 (예: 매일 아침 글쓰기)" ${state.editing ? "" : "readonly"}>${p.title}</textarea>
+        </div>
+        <div class="section field-block">
+          <div class="section-h"><div><h3>Outcome</h3><p class="hint">이 습관으로 되고 싶은 모습</p></div></div>
+          <textarea id="planOutcome" placeholder="예: 3개월 뒤, 부담 없이 20분 쓰는 사람" ${state.editing ? "" : "readonly"}>${p.outcome || ""}</textarea>
+        </div>
+        <div class="section">
+          <div class="streak-row">
+            <div class="streak-num" id="streakNum">${p.streak || 0}</div>
+            <div>
+              <strong style="display:block;font-size:14px;margin-bottom:4px">일 연속</strong>
+              <p style="font-size:12px;color:var(--muted)">칸을 눌러 오늘 체크 · 완벽보다 연속</p>
+            </div>
+          </div>
+          <div class="heat-labs">${days.map(d => `<span>${d}</span>`).join("")}</div>
+          <div class="heatmap">
+            ${(p.heat || []).map(lv => `<div class="heat-day ${lv ? "l"+lv : ""}"></div>`).join("")}
+          </div>
+        </div>
+        <div class="section field-block">
+          <div class="section-h"><div><h3>이번 주 목표</h3></div></div>
+          <input type="text" id="planWeekGoal" value="${p.weekGoal || ""}" placeholder="예: 이번 주 5일 · 최소 10분" ${state.editing ? "" : "readonly"} />
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>이번 주 행동</h3></div></div>
+          ${listHTML("actions", p.actions, { placeholder: "구체 행동" })}
+        </div>
+        <div class="section">
+          <div class="section-h"><div><h3>습관 앵커</h3><p class="hint">이미 하는 일에 붙이기</p></div></div>
+          <div class="anchors">
+            <div class="anchor"><div class="at">Morning</div><textarea id="planMorning" placeholder="예: 커피 내리기 전" ${state.editing ? "" : "readonly"}>${p.morning || ""}</textarea></div>
+            <div class="anchor"><div class="at">Fallback</div><textarea id="planEvening" placeholder="예: 잠들기 전 5분" ${state.editing ? "" : "readonly"}>${p.evening || ""}</textarea></div>
+          </div>
+        </div>
+        <div class="section field-block">
+          <div class="section-h"><div><h3>주간 회고</h3></div></div>
+          <textarea id="planReflect" placeholder="잘 된 점 / 막힌 점 / 다음 주 조정" ${state.editing ? "" : "readonly"}>${p.reflect || ""}</textarea>
+        </div>
+        <div class="sticky-actions">
+          <button type="button" class="secondary" id="plannerToPick2">유형 변경</button>
+          <button type="button" class="cta warn" id="btnSavePlan">${state.editingGoalId ? "수정 저장" : "목표 저장하고 홈으로"}</button>
+        </div>`;
+    }
+
+    function renderPlanner() {
+      const p = state.draft;
+      const body = document.getElementById("plannerBody");
+      if (p.type === "backplan") body.innerHTML = renderBackplan(p);
+      else if (p.type === "deliverable") body.innerHTML = renderDeliverable(p);
+      else body.innerHTML = renderRoutine(p);
+      bindPlannerInteractions();
+      document.getElementById("plannerToPick2")?.addEventListener("click", () => showView("pick"));
+    }
+
+    function openNew(type) {
+      state.draft = blankPlan(type);
+      state.editingGoalId = null;
+      state.editing = true;
+      renderPlanner();
+      showView("planner");
+    }
+
+    function openExisting(goalId) {
+      const g = GOALS.find(x => x.id === goalId);
+      if (!g) return;
+      state.editingGoalId = goalId;
+      state.editing = true;
+      if (g.plan) {
+        state.draft = JSON.parse(JSON.stringify(g.plan));
+      } else {
+        state.draft = blankPlan(g.type);
+        state.draft.title = g.title;
+        state.draft.deadline = g.deadline || "";
+        if (state.draft.today && g.today) {
+          state.draft.today = g.today.map(t => ({ ...t }));
+        }
+        if (state.draft.actions && g.type === "routine" && g.today) {
+          state.draft.actions = g.today.map(t => ({ ...t }));
+        }
+      }
+      renderPlanner();
+      showView("planner");
+    }
+
+    function savePlan() {
+      syncDraftFromDOM();
+      const p = state.draft;
+      if (!p.title.trim()) {
+        toast("목표 제목을 먼저 적어주세요");
+        document.getElementById("planTitle")?.focus();
+        return;
+      }
+      const todayItems = p.type === "routine"
+        ? (p.actions || []).filter(t => t.text.trim()).map(t => ({ id: t.id, text: t.text, done: !!t.done }))
+        : (p.today || p.review || []).filter(t => t.text && t.text.trim()).slice(0, 5).map(t => ({
+            id: t.id || uid(), text: t.text, done: !!t.done,
+          }));
+
+      if (state.editingGoalId) {
+        const g = GOALS.find(x => x.id === state.editingGoalId);
+        g.title = p.title.trim();
+        g.deadline = p.deadline || null;
+        g.plan = JSON.parse(JSON.stringify(p));
+        if (todayItems.length) g.today = todayItems;
+        toast("계획이 수정됐어요");
+      } else {
+        GOALS = [{
+          id: uid(),
+          type: p.type,
+          emoji: EMOJIS[p.type],
+          color: COLORS[p.type],
+          title: p.title.trim(),
+          deadline: p.deadline || null,
+          plan: JSON.parse(JSON.stringify(p)),
+          today: todayItems.length ? todayItems : [{ id: uid(), text: "첫 할 일 정하기", done: false }],
+        }, ...GOALS];
+        toast("새 목표가 홈에 추가됐어요");
+      }
+      state.editing = false;
+      renderHome();
+      showView("home");
+    }
+
+    // Events
+    document.getElementById("fabAdd").addEventListener("click", () => showView("pick"));
+    document.getElementById("btnGoalsList").addEventListener("click", () => toast(`목표 ${GOALS.length}개`));
+    document.getElementById("pickBack").addEventListener("click", () => showView("home"));
+    document.getElementById("plannerBack").addEventListener("click", () => {
+      if (state.editing && state.draft?.title) {
+        if (!confirm("저장하지 않고 나갈까요?")) return;
+      }
+      showView("home");
+    });
+    document.getElementById("plannerToPick").addEventListener("click", () => showView("pick"));
+    document.getElementById("btnToggleEdit").addEventListener("click", () => {
+      syncDraftFromDOM();
+      state.editing = !state.editing;
+      renderPlanner();
+      toast(state.editing ? "수정 모드" : "보기 모드");
+    });
+    document.getElementById("calPrev").addEventListener("click", () => {
+      state.calMonth--; if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
+      renderCalendar();
+    });
+    document.getElementById("calNext").addEventListener("click", () => {
+      state.calMonth++; if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+      renderCalendar();
+    });
+    document.querySelectorAll(".type-card").forEach(card => {
+      card.addEventListener("click", () => openNew(card.dataset.type));
+    });
+
+    renderHome();
+  </script>
+</body>
+</html>

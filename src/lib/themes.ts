@@ -32,6 +32,9 @@ export type ThemePreset = {
 const THEME_STORAGE_KEY = 'futureme-theme'
 export const THEME_CHANGE_EVENT = 'futureme-theme-change'
 
+/** 고정 테마 — 5번 Cobalt · White (테마 선택 UI 비활성) */
+export const DEFAULT_THEME_ID: ThemeId = 'cobalt'
+
 export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'crimson',
@@ -226,9 +229,12 @@ export function saveThemeId(id: ThemeId): void {
   window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: id }))
 }
 
-/** 앱 시작 시 — 저장된 테마만 적용 (없으면 index.css 기본 유지) */
-export function initTheme(): ThemeId | null {
-  const id = loadThemeId()
-  if (id) applyTheme(id)
-  return id
+/** 앱 시작 시 — 5번 테마 ID만 고정 (비주얼은 goals.html / goal-app.css 기준) */
+export function initTheme(): ThemeId {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, DEFAULT_THEME_ID)
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_THEME_ID
 }

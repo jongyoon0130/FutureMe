@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 127.0.0.1 --open /goals.html",
+    "dev:chat": "vite --open /index.html",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "bun test",

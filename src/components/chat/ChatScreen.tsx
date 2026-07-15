@@ -3,7 +3,6 @@ import type { SelfProfile, ChatMessage, StyleSample } from '../../types/self'
 import { INSIGHT_LABELS } from '../../types/self'
 import { Button } from '../ui'
 import { ProfileSheet } from '../profile/ProfileSheet'
-import { ThemePicker } from '../theme/ThemePicker'
 import { ChatMessageList } from './ChatMessageList'
 import { splitMessageParagraphs, formatChatTime, stripApiTurnTimestampFromContent } from '../../lib/chatDisplay'
 import {
@@ -869,7 +868,6 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
 
       {showSettings && !selectMode && (
         <div className="px-5 py-4 bg-surface-2 border-b border-border animate-fade-up space-y-4">
-          <ThemePicker />
           <div>
             <p className="text-xs text-muted mb-1">Gemini API Key (무료 · 없으면 로컬 엔진 사용)</p>
             <p className="text-[11px] text-muted/70 mb-2">

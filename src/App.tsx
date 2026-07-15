@@ -4,6 +4,10 @@ import { ChatOnboarding } from './components/onboarding/ChatOnboarding'
 import { ChatScreen } from './components/chat/ChatScreen'
 import { ProfileListScreen } from './components/list/ProfileListScreen'
 import { PlannerScreen } from './components/planner/PlannerScreen'
+import { HomeScreen } from './components/home/HomeScreen'
+import { ScheduleScreen } from './components/schedule/ScheduleScreen'
+import { AppShell } from './components/nav/AppShell'
+import { DEFAULT_MAIN_TAB, type MainTab } from './components/nav/types'
 import { AuthScreen } from './components/auth/AuthScreen'
 import { APP_NAME } from './lib/brand'
 import { FutureMeLogo } from './components/brand/FutureMeLogo'
@@ -31,6 +35,7 @@ type Screen = 'list' | 'onboarding' | 'chat' | 'planner'
 export default function App() {
   const { configured, loading: authLoading, syncing, session } = useAuth()
   const cloudPushFailing = useSyncExternalStore(subscribeCloudPushStatus, isCloudPushFailing)
+  const [activeTab, setActiveTab] = useState<MainTab>(DEFAULT_MAIN_TAB)
   const [screen, setScreen] = useState<Screen>('list')
   const [summaries, setSummaries] = useState<ProfileSummary[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
@@ -92,6 +97,7 @@ export default function App() {
       refreshList()
       setActiveProfileId(null)
       setProfile(null)
+      setActiveTab('chat')
       setScreen('list')
     })
   }
@@ -156,7 +162,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-full bg-void">
+    <div className="goal-app h-full bg-void">
       {configured && session && syncing && (
         <div
           className="fixed top-0 inset-x-0 z-50 py-1.5 text-center text-[11px] text-muted bg-surface/90 border-b border-border/30 backdrop-blur-sm"
@@ -174,56 +180,73 @@ export default function App() {
         </div>
       )}
       <div className="relative h-full">
-        {screen === 'list' && (
-          <ProfileListScreen
-            summaries={summaries}
-            onSelect={openProfile}
-            onCreateNew={() => {
-              const saved = loadOnboardingProgress<{ version?: number; stepIdx?: number }>()
-              if (saved?.version === ONBOARDING_PROGRESS_VERSION && saved.stepIdx && saved.stepIdx > 0) {
-                const resume = window.confirm(
-                  '진행 중인 만들기가 저장돼 있어요.\n\n확인 → 이어서 만들기\n취소 → 처음부터 새로 만들기',
-                )
-                if (resume) {
-                  setScreen('onboarding')
-                  return
+        <AppShell
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          showNav={screen === 'list'}
+          chat={
+            <ProfileListScreen
+              summaries={summaries}
+              onSelect={openProfile}
+              onCreateNew={() => {
+                const saved = loadOnboardingProgress<{ version?: number; stepIdx?: number }>()
+                if (saved?.version === ONBOARDING_PROGRESS_VERSION && saved.stepIdx && saved.stepIdx > 0) {
+                  const resume = window.confirm(
+                    '진행 중인 만들기가 저장돼 있어요.\n\n확인 → 이어서 만들기\n취소 → 처음부터 새로 만들기',
+                  )
+                  if (resume) {
+                    setScreen('onboarding')
+                    return
+                  }
                 }
-              }
-              clearOnboardingProgress()
-              setScreen('onboarding')
-            }}
-            onRestoreBackup={handleRestoreBackup}
-            onDelete={handleDeleteProfile}
-          />
-        )}
+                clearOnboardingProgress()
+                setScreen('onboarding')
+              }}
+              onRestoreBackup={handleRestoreBackup}
+              onDelete={handleDeleteProfile}
+            />
+          }
+          home={<HomeScreen />}
+          schedule={<ScheduleScreen />}
+        />
+
         {screen === 'onboarding' && (
-          <ChatOnboarding
-            onComplete={handleComplete}
-            onExitToList={() => setScreen('list')}
-          />
+          <div className="fixed inset-0 z-40 bg-void">
+            <ChatOnboarding
+              onComplete={handleComplete}
+              onExitToList={() => {
+                setActiveTab('chat')
+                setScreen('list')
+              }}
+            />
+          </div>
         )}
         {screen === 'chat' && profile && activeProfileId && (
-          <ChatScreen
-            profileId={activeProfileId}
-            profile={profile}
-            onBack={handleBackFromChat}
-            onProfileDeleted={handleProfileDeleted}
-            onProfileUpdate={handleProfileUpdate}
-            onOpenPlanner={() => setScreen('planner')}
-            initialPrompt={pendingChatPrompt}
-            onInitialPromptUsed={() => setPendingChatPrompt(null)}
-          />
+          <div className="fixed inset-0 z-40 bg-void">
+            <ChatScreen
+              profileId={activeProfileId}
+              profile={profile}
+              onBack={handleBackFromChat}
+              onProfileDeleted={handleProfileDeleted}
+              onProfileUpdate={handleProfileUpdate}
+              onOpenPlanner={() => setScreen('planner')}
+              initialPrompt={pendingChatPrompt}
+              onInitialPromptUsed={() => setPendingChatPrompt(null)}
+            />
+          </div>
         )}
         {screen === 'planner' && profile && (
-          <PlannerScreen
-            profile={profile}
-            onBack={() => setScreen('chat')}
-            onProfileUpdate={handleProfileUpdate}
-            onAskFuture={(prompt) => {
-              setPendingChatPrompt(prompt)
-              setScreen('chat')
-            }}
-          />
+          <div className="fixed inset-0 z-40 bg-void">
+            <PlannerScreen
+              profile={profile}
+              onBack={() => setScreen('chat')}
+              onProfileUpdate={handleProfileUpdate}
+              onAskFuture={(prompt) => {
+                setPendingChatPrompt(prompt)
+                setScreen('chat')
+              }}
+            />
+          </div>
         )}
       </div>
     </div>

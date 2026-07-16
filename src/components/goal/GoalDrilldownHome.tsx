@@ -10,6 +10,8 @@ import {
 } from '../../lib/goalMiscTodos'
 import type { SelfProfile } from '../../types/self'
 import type { GoalPlan } from '../../types/goalPlan'
+import { GoalDayClose } from './GoalDayClose'
+import { daysUntilDeadline, planProgress } from '../../lib/goalPlanBridge'
 import {
   aggregateForDate,
   countItems,
@@ -265,6 +267,17 @@ export function GoalDrilldownHome({
     ? `${now.getMonth() + 1}월 ${now.getDate()}일`
     : `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일`
   const allCount = countItems([...aggregated.daily, ...aggregated.weekly, ...aggregated.monthly])
+  // 하루 마감의 근거 = "오늘 할 일" (목표 일간 + 일상 투두)
+  const dailyCount = countItems([...aggregated.daily, ...miscAgg.daily])
+  // 타임캡슐 — 목표를 만들 때 쓴 "이뤘을 때" 답변이, 다 이뤘거나 마감일이 온 날 편지로 도착
+  const timeCapsules = plans.filter((p) => {
+    const letter = p.motivation?.['success-both']?.trim()
+    if (!letter) return false
+    const prog = planProgress(p)
+    const achieved = prog.total > 0 && prog.done === prog.total
+    const dday = p.intake?.deadline ? daysUntilDeadline(p.intake.deadline, now) : null
+    return achieved || (dday != null && dday <= 0)
+  })
 
   const getDailyStats = useCallback(
     (day: number) => {
@@ -381,6 +394,29 @@ export function GoalDrilldownHome({
         {!plans.length ? (
           <p className="goal-empty">+ 로 최종 목표를 만들면 기간별 계획도 함께 관리할 수 있어요</p>
         ) : null}
+        {isTodaySelected ? (
+          <GoalDayClose
+            ownerId={profile.id}
+            done={dailyCount.done}
+            total={dailyCount.total}
+            plans={plans}
+          />
+        ) : null}
+        {timeCapsules.map((p) => {
+          const prog = planProgress(p)
+          const achieved = prog.total > 0 && prog.done === prog.total
+          return (
+            <section key={`letter-${p.id}`} className="goal-letter">
+              <p className="goal-letter-tag">📮 과거의 네가 보낸 편지 · “{p.title}”을 시작하던 날</p>
+              <p className="goal-letter-body">“{p.motivation?.['success-both']?.trim()}”</p>
+              <p className="goal-letter-foot">
+                {achieved
+                  ? '그때 상상한 오늘에 진짜로 도착했어.'
+                  : '마감일이 왔어. 그날의 상상과 지금을 비교해봐 — 거기까지의 거리가 다음 목표가 돼.'}
+              </p>
+            </section>
+          )
+        })}
         <SecLabel>최종 목표 · 탭하면 가지치기</SecLabel>
         {plans.map((p) => (
           <GoalSwipeDelete key={p.id} onDelete={() => handleDeletePlan(p.id)}>

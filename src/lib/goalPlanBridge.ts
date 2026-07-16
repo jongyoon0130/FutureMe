@@ -14,6 +14,7 @@ import {
   periodKeyForTier,
   type MiscTodoItem,
 } from './goalMiscTodos'
+import { dayCloseStreak, dayKey, loadDayCloses } from './dayClose'
 
 const OWNER_KEY = 'goal-app-owner-id'
 const PLANS_PREFIX = 'goal-plans-'
@@ -92,6 +93,85 @@ export function todayMiscProgress(now = new Date()): { done: number; total: numb
 const clip = (v: string, max: number): string => {
   const t = v.trim()
   return t.length > max ? `${t.slice(0, max)}…` : t
+}
+
+// ---------------------------------------------------------------------------
+// 역사 — "시간이 만드는 해자". 오늘의 스냅샷 위에, 실제로 걸어온 기록을 얹는다.
+// 범용 챗봇은 흉내 낼 수 없는, 증거를 가진 격려의 재료.
+// ---------------------------------------------------------------------------
+
+/** 목표 트리(월·주·일)의 체크 진행 — 이룬 목표 판정용 */
+export function planProgress(plan: GoalPlan): { done: number; total: number } {
+  let done = 0
+  let total = 0
+  const count = (items?: { done: boolean }[]) => {
+    for (const it of items ?? []) {
+      total += 1
+      if (it.done) done += 1
+    }
+  }
+  const h = plan.hierarchy
+  if (h) {
+    for (const m of h.months ?? []) count(m.items)
+    for (const w of h.weeks ?? []) {
+      count(w.items)
+      for (const d of w.days ?? []) count(d.items)
+    }
+    for (const d of h.days ?? []) count(d.items)
+  }
+  return { done, total }
+}
+
+/** 체크가 하나 이상 있고 전부 완료된 목표 — "이미 함께 이뤄낸" 것 */
+export function achievedPlans(plans: GoalPlan[]): GoalPlan[] {
+  return plans.filter((p) => {
+    const { done, total } = planProgress(p)
+    return total > 0 && done === total
+  })
+}
+
+/** 최근 N일 동안 실제 완료한 홈 '오늘 할 일' 개수 (periodKey가 날짜라 정확) */
+export function recentMiscDoneCount(days = 7, now = new Date()): number {
+  try {
+    const owner = readOwnerId()
+    if (!owner) return 0
+    const since = new Date(now)
+    since.setDate(since.getDate() - (days - 1))
+    const sinceKey = todayPeriodKey(since)
+    return readMiscTodosLite(owner).filter(
+      (t) => t.tier === 'daily' && t.done && (t.periodKey ?? '') >= sinceKey,
+    ).length
+  } catch {
+    return 0
+  }
+}
+
+function historyLines(now: Date): string[] {
+  const lines: string[] = []
+
+  for (const p of achievedPlans(readGoalPlansLite()).slice(0, 2)) {
+    lines.push(`이미 함께 이뤄낸 목표: "${clip(p.title, 40)}" — 숙제가 아니라 같이 이룬 기억으로 회상 가능`)
+  }
+
+  const recentDone = recentMiscDoneCount(7, now)
+  if (recentDone > 0) lines.push(`최근 7일 실제 완료: ${recentDone}개 — 격려는 이 숫자처럼 증거로 할 것`)
+
+  const owner = readOwnerId()
+  if (owner) {
+    const closes = loadDayCloses(owner)
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yRec = closes.find((r) => r.date === dayKey(yesterday))
+    if (yRec) {
+      lines.push(
+        `어제 하루 마감 기록: ${yRec.mood} (${yRec.done}/${yRec.total})${yRec.note ? ` — "${clip(yRec.note, 60)}"` : ''}`,
+      )
+    }
+    const streak = dayCloseStreak(closes, now)
+    if (streak >= 2) lines.push(`하루 마감 ${streak}일 연속 — 완료 수보다 이 "돌아오는 리듬"을 알아봐줄 것`)
+  }
+
+  return lines
 }
 
 function miscAggregatedLite(items: MiscTodoItem[], date: Date): {
@@ -194,6 +274,8 @@ export function describeGoalBoardForPrompt(now = new Date()): string {
   lines.push(...formatTaskTier('오늘 할 일', board.daily))
   lines.push(...formatTaskTier('이번 주', board.weekly))
   lines.push(...formatTaskTier('이번 달', board.monthly))
+
+  lines.push(...historyLines(now))
 
   return lines.join('\n')
 }

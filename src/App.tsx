@@ -3,7 +3,6 @@ import type { SelfProfile } from './types/self'
 import { ChatOnboarding } from './components/onboarding/ChatOnboarding'
 import { ChatScreen } from './components/chat/ChatScreen'
 import { ProfileListScreen } from './components/list/ProfileListScreen'
-import { PlannerScreen } from './components/planner/PlannerScreen'
 import { HomeScreen } from './components/home/HomeScreen'
 import { ScheduleScreen } from './components/schedule/ScheduleScreen'
 import { AppShell } from './components/nav/AppShell'
@@ -30,7 +29,7 @@ import {
   type ProfileSummary,
 } from './lib/storage'
 
-type Screen = 'list' | 'onboarding' | 'chat' | 'planner'
+type Screen = 'list' | 'onboarding' | 'chat'
 
 export default function App() {
   const { configured, loading: authLoading, syncing, session } = useAuth()
@@ -98,6 +97,18 @@ export default function App() {
       setActiveProfileId(null)
       setProfile(null)
       setActiveTab('chat')
+      setScreen('list')
+    })
+  }
+
+  // 채팅의 "계획" 버튼 — 예전엔 별도 구 플래너 화면을 열었지만,
+  // 이제 계획의 정본은 홈 계획표 하나다. 채팅을 닫고 홈 탭으로 보낸다.
+  const handleOpenPlanner = () => {
+    void reconcileProfileSummariesFromChats().then(() => {
+      refreshList()
+      setActiveProfileId(null)
+      setProfile(null)
+      setActiveTab('home')
       setScreen('list')
     })
   }
@@ -229,22 +240,9 @@ export default function App() {
               onBack={handleBackFromChat}
               onProfileDeleted={handleProfileDeleted}
               onProfileUpdate={handleProfileUpdate}
-              onOpenPlanner={() => setScreen('planner')}
+              onOpenPlanner={handleOpenPlanner}
               initialPrompt={pendingChatPrompt}
               onInitialPromptUsed={() => setPendingChatPrompt(null)}
-            />
-          </div>
-        )}
-        {screen === 'planner' && profile && (
-          <div className="fixed inset-0 z-40 bg-void">
-            <PlannerScreen
-              profile={profile}
-              onBack={() => setScreen('chat')}
-              onProfileUpdate={handleProfileUpdate}
-              onAskFuture={(prompt) => {
-                setPendingChatPrompt(prompt)
-                setScreen('chat')
-              }}
             />
           </div>
         )}

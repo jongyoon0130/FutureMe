@@ -2192,3 +2192,160 @@ html, body, #root {
   color: var(--goal-accent-deep);
   font-weight: 500;
 }
+
+/* ── 하루 마감 (GoalDayClose) ── */
+.goal-dayclose {
+  background: var(--goal-surface, #fff);
+  border: 1px solid var(--goal-line, #e8ebf0);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin: 14px 0;
+  box-shadow: 0 1px 4px rgba(74, 81, 89, 0.04);
+}
+
+.goal-dayclose.evening {
+  border-color: var(--goal-accent, #62d98a);
+  background: var(--goal-accent-soft, #e9fbf0);
+}
+
+.goal-dayclose-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goal-dayclose-tag {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--goal-accent-deep, #4bc878);
+}
+
+.goal-dayclose-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--goal-muted, #6b7583);
+}
+
+.goal-dayclose-btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--goal-accent, #62d98a);
+  flex-shrink: 0;
+}
+
+.goal-dayclose-moods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.goal-dayclose-mood {
+  border: 1px solid var(--goal-line, #e8ebf0);
+  background: transparent;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--goal-muted, #6b7583);
+}
+
+.goal-dayclose-mood.on {
+  border-color: var(--goal-accent, #62d98a);
+  background: var(--goal-accent-soft, #e9fbf0);
+  color: var(--goal-accent-deep, #4bc878);
+  font-weight: 600;
+}
+
+.goal-dayclose-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--goal-line, #e8ebf0);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--goal-ink, #3a4048);
+  background: var(--goal-bg, #f7f8fa);
+  resize: none;
+  outline: none;
+}
+
+.goal-dayclose-input:focus {
+  border-color: var(--goal-accent, #62d98a);
+}
+
+.goal-dayclose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.goal-dayclose-cancel {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--goal-muted-light, #919aa6);
+  padding: 9px 10px;
+}
+
+.goal-dayclose-msg {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--goal-ink, #3a4048);
+}
+
+.goal-dayclose-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--goal-muted, #6b7583);
+}
+
+.goal-dayclose-from {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  text-align: right;
+  color: var(--goal-muted-light, #919aa6);
+}
+
+/* ── 타임캡슐 편지 (goal-letter) ── */
+.goal-letter {
+  background: var(--goal-warn-soft, #fff8e8);
+  border: 1px solid var(--goal-warn, #ffc861);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin: 14px 0;
+}
+
+.goal-letter-tag {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--goal-ink, #3a4048);
+}
+
+.goal-letter-body {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--goal-ink, #3a4048);
+}
+
+.goal-letter-foot {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--goal-muted, #6b7583);
+}

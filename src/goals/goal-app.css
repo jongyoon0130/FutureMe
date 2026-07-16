@@ -2362,3 +2362,23 @@ html, body, #root {
   font-family: inherit;
   color: var(--goal-accent-deep, #4bc878);
 }
+
+.goal-dayclose-manage {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.goal-dayclose-manage button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 11.5px;
+  font-family: inherit;
+  color: var(--goal-muted-light, #919aa6);
+}
+
+.goal-dayclose-manage button:hover {
+  color: var(--goal-ink, #3a4048);
+}

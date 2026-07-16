@@ -64,6 +64,17 @@ export function saveDayClose(ownerId: string, record: DayCloseRecord): DayCloseR
   return next
 }
 
+/** 마감 기록 삭제 — 내 기록은 내 마음대로 고치고 지울 수 있어야 한다 */
+export function removeDayClose(ownerId: string, date: string): DayCloseRecord[] {
+  const next = loadDayCloses(ownerId).filter((r) => r.date !== date)
+  try {
+    localStorage.setItem(storageKey(ownerId), JSON.stringify(next))
+  } catch {
+    /* ignore */
+  }
+  return next
+}
+
 /** 오늘(또는 어제)까지 며칠 연속으로 마감했는지 — "돌아온 날"의 증거 */
 export function dayCloseStreak(records: DayCloseRecord[], today = new Date()): number {
   const dates = new Set(records.map((r) => r.date))

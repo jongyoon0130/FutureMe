@@ -19,6 +19,7 @@ import {
   getDayClose,
   loadDayCloses,
   readChatPersonaLite,
+  removeDayClose,
   saveDayClose,
   type DayCloseRecord,
 } from '../src/lib/dayClose'
@@ -118,5 +119,15 @@ describe('readChatPersonaLite — 채팅 페르소나 살짝 읽기', () => {
 describe('dayKey', () => {
   it('YYYY-MM-DD 형식', () => {
     expect(dayKey(new Date('2026-07-16T09:00:00'))).toBe('2026-07-16')
+  })
+})
+
+describe('removeDayClose — 기록 지우기', () => {
+  it('해당 날짜만 지운다', () => {
+    saveDayClose(OWNER, record('2026-07-15'))
+    saveDayClose(OWNER, record('2026-07-16'))
+    const left = removeDayClose(OWNER, '2026-07-16')
+    expect(left.map((r) => r.date)).toEqual(['2026-07-15'])
+    expect(getDayClose(OWNER, '2026-07-16')).toBeNull()
   })
 })

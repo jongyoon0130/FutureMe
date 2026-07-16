@@ -2349,3 +2349,16 @@ html, body, #root {
   font-size: 12px;
   color: var(--goal-muted, #6b7583);
 }
+
+.goal-dayclose-talk {
+  display: block;
+  margin-top: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--goal-accent-deep, #4bc878);
+}

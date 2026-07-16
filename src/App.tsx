@@ -217,7 +217,18 @@ export default function App() {
               onDelete={handleDeleteProfile}
             />
           }
-          home={<HomeScreen />}
+          home={
+            <HomeScreen
+              onTellFuture={(prompt) => {
+                // 하루 마감 → 미래의 나에게 이어 말하기: 첫 프로필의 채팅을 프리필로 연다
+                const first = loadProfileSummaries()[0]
+                setActiveTab('chat')
+                if (!first) return
+                setPendingChatPrompt(prompt)
+                openProfile(first.id)
+              }}
+            />
+          }
           schedule={<ScheduleScreen />}
         />
 

@@ -37,3 +37,17 @@ create policy "settings own" on public.futureme_settings
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create index if not exists futureme_profiles_user_updated on public.futureme_profiles (user_id, updated_at desc);
+
+-- 홈 목표·할 일 (goal-plans, misc todos)
+create table if not exists public.futureme_goal_data (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  owner_id text not null,
+  plans jsonb not null default '[]'::jsonb,
+  misc_todos jsonb not null default '[]'::jsonb,
+  updated_at bigint not null
+);
+
+alter table public.futureme_goal_data enable row level security;
+
+create policy "goal data own" on public.futureme_goal_data
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

@@ -48,6 +48,20 @@ export type RemoteChatRow = {
   updated_at: number
 }
 
+export type RemoteGoalDataRow = {
+  owner_id: string
+  plans: unknown[]
+  misc_todos: unknown[]
+  updated_at: number
+}
+
+export type GoalDataPayload = {
+  ownerId: string
+  plans: unknown[]
+  miscTodos: unknown[]
+  updatedAt: number
+}
+
 export async function pushProfileToCloud(
   profile: SelfProfile,
   preview: string,
@@ -99,6 +113,38 @@ export async function pushChatToCloud(
     throw error
   }
   noteCloudPushSuccess()
+}
+
+export async function pushGoalDataToCloud(payload: GoalDataPayload): Promise<void> {
+  const ctx = requireClient()
+  if (!ctx) return
+
+  const { error } = await ctx.client.from('futureme_goal_data').upsert(
+    {
+      user_id: ctx.userId,
+      owner_id: payload.ownerId,
+      plans: payload.plans,
+      misc_todos: payload.miscTodos,
+      updated_at: payload.updatedAt,
+    },
+    { onConflict: 'user_id' },
+  )
+  if (error) {
+    noteCloudPushFailure()
+    throw error
+  }
+  noteCloudPushSuccess()
+}
+
+export async function fetchRemoteGoalData(userId: string): Promise<RemoteGoalDataRow | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('futureme_goal_data')
+    .select('owner_id, plans, misc_todos, updated_at')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return (data as RemoteGoalDataRow | null) ?? null
 }
 
 /**

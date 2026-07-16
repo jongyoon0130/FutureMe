@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { SelfProfile } from '../../types/self'
 import type { GoalPlan } from '../../types/goalPlan'
 import { deleteGoalPlan, loadGoalPlans } from '../../lib/goalPlanStore'
+import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
 import { planSummaryLine } from '../../lib/goalTemplateEngine'
 import { GoalCreateWizard } from './GoalCreateWizard'
 import { GoalDrilldownHome } from './GoalDrilldownHome'
@@ -23,6 +24,12 @@ export function GoalPlanSheet({ profile, onClose, embedded = false }: Props) {
   useEffect(() => {
     setPlans(loadGoalPlans(profile.id, profile))
   }, [mode, profile.id, profile])
+
+  useEffect(() => {
+    const onSynced = () => setPlans(loadGoalPlans(profile.id, profile))
+    window.addEventListener(GOAL_DATA_SYNC_EVENT, onSynced)
+    return () => window.removeEventListener(GOAL_DATA_SYNC_EVENT, onSynced)
+  }, [profile.id, profile])
 
   useEffect(() => {
     if (mode !== 'drill' || !activePlanId) return

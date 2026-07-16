@@ -5,6 +5,7 @@ import { mergeMotivationAnswers, recoverPlansMotivation } from './goalMotivation
 import { hydratePlansFromSections } from './goalSectionHydration'
 import { restoreGoalPlansFromSnapshot, writeGoalPlanSnapshot } from './goalPlanSnapshot'
 import { migrateGoalPlan } from './goalTemplateEngine'
+import { isApplyingRemoteGoalData } from './goalDataSyncState'
 
 const CURRENT_PREFIX = 'goal-plans-'
 /** 채팅 앱 시절 저장 키 */
@@ -81,6 +82,9 @@ function needsPersistMigration(before: GoalPlan[], after: GoalPlan[]): boolean {
 function saveAll(profileId: string, plans: GoalPlan[]): void {
   localStorage.setItem(key(profileId), JSON.stringify(plans))
   writeGoalPlanSnapshot(profileId, plans)
+  if (!isApplyingRemoteGoalData()) {
+    void import('./goalDataSync').then(({ scheduleGoalDataSync }) => scheduleGoalDataSync())
+  }
 }
 
 /** 구 저장소 → 현재 owner 키로 병합 */

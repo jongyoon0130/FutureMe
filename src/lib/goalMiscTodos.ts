@@ -1,5 +1,6 @@
 import type { AggregatedItem } from './goalHierarchyEngine'
 import { monthKey, startOfWeekMonday } from './goalCalendar'
+import { isApplyingRemoteGoalData } from './goalDataSyncState'
 
 export const MISC_PLAN_ID = '__misc__'
 export const MISC_PLAN_TITLE = '일상'
@@ -48,6 +49,9 @@ export function loadMiscTodos(profileId: string): MiscTodoItem[] {
 
 export function saveMiscTodos(profileId: string, items: MiscTodoItem[]): void {
   localStorage.setItem(storageKey(profileId), JSON.stringify(items))
+  if (!isApplyingRemoteGoalData()) {
+    void import('./goalDataSync').then(({ scheduleGoalDataSync }) => scheduleGoalDataSync())
+  }
 }
 
 export function addMiscTodo(

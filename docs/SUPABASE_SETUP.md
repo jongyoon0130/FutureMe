@@ -6,6 +6,7 @@
 
 1. [supabase.com](https://supabase.com) → **New project** (예: `futureme`)
 2. **SQL Editor** → `supabase/schema.sql` 내용 붙여넣고 **Run**
+   - 이미 프로젝트가 있으면, 파일 맨 아래 `futureme_goal_data` 블록만 추가 실행해도 됩니다.
 3. **Project Settings → API** 에서 복사:
    - Project URL → `VITE_SUPABASE_URL`
    - anon public key → `VITE_SUPABASE_ANON_KEY`
@@ -59,10 +60,10 @@ Project → **Settings → Environment Variables**
 | 상황 | 동작 |
 |------|------|
 | env 없음 | 로그인 없이 로컬 전용 |
-| Google 로그인 | 프로필·채팅 클라우드 동기화 |
+| Google 로그인 | 프로필·채팅·홈 목표·할 일 클라우드 동기화 |
 | Gemini API 키 | **기기 localStorage만** (TalkBack과 동일) |
 
 ## 6. TalkBack과 분리
 
-- DB 테이블: `futureme_profiles`, `futureme_chats`, `futureme_settings`
+- DB 테이블: `futureme_profiles`, `futureme_chats`, `futureme_settings`, `futureme_goal_data`
 - TalkBack(`talkback_*`)과 **데이터 섞이지 않음**

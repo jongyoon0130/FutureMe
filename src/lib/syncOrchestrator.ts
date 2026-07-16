@@ -1,6 +1,7 @@
 import type { ChatMessage, SelfProfile } from '../types/self'
 import {
   fetchRemoteChats,
+  fetchRemoteGoalData,
   fetchRemoteProfiles,
   fetchRemoteSettings,
   pushChatToCloud,
@@ -28,6 +29,7 @@ import {
   removeProfileTombstone,
   deleteProfileLocally,
 } from './storage'
+import { hasLocalGoalData, pushLocalGoalData, syncGoalDataOnLogin } from './goalDataSync'
 
 /** tombstone이 제거된, 실제 프로필 데이터가 담긴 행 */
 type LiveRemoteProfileRow = RemoteProfileRow & { profile_data: SelfProfile }
@@ -40,7 +42,7 @@ export type SyncResult = {
 let syncInFlight: Promise<SyncResult> | null = null
 
 export function hasLocalData(): boolean {
-  return loadProfileSummaries().length > 0
+  return loadProfileSummaries().length > 0 || hasLocalGoalData()
 }
 
 function chatTimestamp(messages: ChatMessage[]): number {
@@ -110,6 +112,7 @@ async function uploadAllLocal(): Promise<number> {
     await pushChatToCloud(s.id, messages, getLocalChatRevision(s.id) || chatTimestamp(messages) || s.updatedAt)
   }
   await pushSettingsToCloud(loadModel())
+  await pushLocalGoalData().catch(() => {})
   return summaries.length
 }
 
@@ -227,10 +230,11 @@ export async function syncOnLogin(userId: string): Promise<SyncResult> {
 
     const remoteRows = await fetchRemoteProfiles(userId)
     const remoteChats = await fetchRemoteChats(userId)
+    const remoteGoal = await fetchRemoteGoalData(userId).catch(() => null)
     // 삭제 기록을 먼저 반영 — 지운 프로필은 다시 내려받지 않고, 로컬에서도 지운다
     const remoteProfiles = await reconcileDeletedProfiles(remoteRows)
     const localHas = hasLocalData() // reconcile이 로컬 프로필을 지울 수 있으므로 이후에 계산
-    const remoteHas = remoteProfiles.length > 0
+    const remoteHas = remoteProfiles.length > 0 || remoteGoal != null
 
     if (localHas && !remoteHas) {
       const count = await uploadAllLocal()
@@ -240,6 +244,7 @@ export async function syncOnLogin(userId: string): Promise<SyncResult> {
 
     if (!localHas && remoteHas) {
       const count = await downloadAllRemote(remoteProfiles, remoteChats)
+      await syncGoalDataOnLogin(userId)
       invalidateChatLoadCache()
       const settings = await fetchRemoteSettings(userId)
       if (settings?.gemini_model) {
@@ -254,6 +259,7 @@ export async function syncOnLogin(userId: string): Promise<SyncResult> {
 
     if (localHas && remoteHas) {
       await mergeLocalAndRemote(remoteProfiles, remoteChats)
+      await syncGoalDataOnLogin(userId)
       invalidateChatLoadCache()
       const settings = await fetchRemoteSettings(userId)
       if (settings?.gemini_model) {
@@ -285,7 +291,7 @@ export async function uploadLocalWithConfirm(): Promise<SyncResult | null> {
   }
 
   const ok = window.confirm(
-    '이 기기에 저장된 프로필·채팅을 구글 계정에 올릴까요?\n\n다른 기기에서도 같은 데이터를 쓸 수 있어요.',
+    '이 기기에 저장된 프로필·채팅·홈 목표를 구글 계정에 올릴까요?\n\n다른 기기에서도 같은 데이터를 쓸 수 있어요.',
   )
   if (!ok) return null
 

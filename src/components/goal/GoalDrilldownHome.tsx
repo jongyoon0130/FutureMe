@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   MISC_PLAN_ID,
   loadMiscTodos,
@@ -41,6 +41,7 @@ import {
   upsertWeekItemLabel,
 } from '../../lib/goalHierarchyMutations'
 import { touchGoalPlan, deleteGoalPlan } from '../../lib/goalPlanStore'
+import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
 import { getRoutineWeekProgress, isRoutinePlan } from '../../lib/goalRoutineEngine'
 import { GoalEditPlanForm } from './GoalEditPlanForm'
 import { GoalHierarchyTree } from './GoalHierarchyTree'
@@ -88,6 +89,12 @@ export function GoalDrilldownHome({
   const [calMonth, setCalMonth] = useState<number>(() => new Date().getMonth())
   const [addingTier, setAddingTier] = useState<'daily' | 'weekly' | 'monthly' | null>(null)
   const [miscTodos, setMiscTodos] = useState<MiscTodoItem[]>(() => loadMiscTodos(profile.id))
+
+  useEffect(() => {
+    const onSynced = () => setMiscTodos(loadMiscTodos(profile.id))
+    window.addEventListener(GOAL_DATA_SYNC_EVENT, onSynced)
+    return () => window.removeEventListener(GOAL_DATA_SYNC_EVENT, onSynced)
+  }, [profile.id])
 
   const now = new Date()
   const selectedDate = useMemo(() => {

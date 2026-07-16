@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { GoalBatteryIcon } from './GoalBatteryIcon'
 import { GoalSwipeDelete } from './GoalSwipeDelete'
 
@@ -293,9 +293,18 @@ export function GoalCheckRow({
   onLabelCommit?: (label: string) => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(text)
+
+  useEffect(() => {
+    if (!editing) setDraft(text)
+  }, [text, editing])
 
   const finishEditing = () => {
-    onLabelCommit?.(text)
+    if (!draft.trim()) {
+      onLabelCommit?.(draft)
+    } else {
+      onLabelChange?.(draft)
+    }
     setEditing(false)
   }
 
@@ -318,9 +327,9 @@ export function GoalCheckRow({
             <input
               type="text"
               className="goal-txt goal-chk-input"
-              value={text}
+              value={draft}
               autoFocus
-              onChange={(e) => onLabelChange(e.target.value)}
+              onChange={(e) => setDraft(e.target.value)}
               onBlur={finishEditing}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -334,7 +343,10 @@ export function GoalCheckRow({
             <button
               type="button"
               className="goal-chk-tap"
-              onClick={() => setEditing(true)}
+              onClick={() => {
+                setDraft(text)
+                setEditing(true)
+              }}
             >
               <span className="goal-txt">{text}</span>
             </button>

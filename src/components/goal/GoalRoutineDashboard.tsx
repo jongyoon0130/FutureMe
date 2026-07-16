@@ -6,6 +6,7 @@ import {
   routineStreakWeeks,
 } from '../../lib/goalRoutineEngine'
 import { SecLabel } from './GoalShell'
+import { isDayToday } from '../../lib/goalHierarchyEngine'
 
 interface Props {
   plan: GoalPlan
@@ -65,7 +66,7 @@ export function GoalRoutineDashboard({ plan, onOpenWeek, onOpenDay }: Props) {
               className={[
                 'goal-routine-day',
                 d.done ? 'done' : '',
-                d.isToday ? 'today' : '',
+                isDayToday(d) ? 'today' : '',
               ].filter(Boolean).join(' ')}
               onClick={() => onOpenDay(d.dayId, current.week.id)}
               title={`${d.dayOfWeek} ${d.dateLabel}`}

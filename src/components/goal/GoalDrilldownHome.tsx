@@ -16,6 +16,7 @@ import {
   aggregateForDate,
   countItems,
   getCurrentWeek,
+  isDayToday,
   itemsPreview,
   pctItems,
   planSummaryFromHierarchy,
@@ -403,6 +404,7 @@ export function GoalDrilldownHome({
           done={dailyCount.done}
           total={dailyCount.total}
           plans={plans}
+          goalItems={aggregated.daily.map((it) => ({ title: it.planTitle, done: it.done }))}
           onTellFuture={onTellFuture}
         />
         {timeCapsules.map((p) => {
@@ -528,7 +530,7 @@ export function GoalDrilldownHome({
               tone="d"
               icon={d.dateLabel.split('/')[1] ?? '·'}
               title={`${d.dayOfWeek} · ${d.dateLabel}`}
-              sub={`${itemsPreview(d.items)}${d.isToday ? ' · 오늘' : ''}`}
+              sub={`${itemsPreview(d.items)}${isDayToday(d) ? ' · 오늘' : ''}`}
               onClick={() => openDay(d.id, week.id)}
             />
           ))}
@@ -543,7 +545,7 @@ export function GoalDrilldownHome({
       <>
         <GoalNav tier="일간" tierClass="d" title={`${day.dateLabel} · ${day.dayOfWeek}`} onBack={pop} />
         <div className="goal-scroll">
-          <SecLabel>{day.isToday ? '오늘 목표 체크리스트' : '목표 체크리스트'}</SecLabel>
+          <SecLabel>{isDayToday(day) ? '오늘 목표 체크리스트' : '목표 체크리스트'}</SecLabel>
           <EditableChecklist
             items={day.items}
             placeholder="오늘 이룰 목표"

@@ -1,5 +1,5 @@
 import type { GoalPlan, PlanCheckItem, PlanSection } from '../types/goalPlan'
-import { getCurrentWeek } from './goalHierarchyEngine'
+import { getCurrentWeek, isDayToday } from './goalHierarchyEngine'
 
 function isTemplateDayLabel(label: string): boolean {
   return /^[월화수목금토일]\s*—\s*$/.test(label.trim()) || /^\d+회차\s*—?\s*$/.test(label.trim())
@@ -44,7 +44,7 @@ export function hydrateHierarchyFromSections(plan: GoalPlan): GoalPlan {
       changed = true
     }
 
-    const todayDay = currentWeek.days.find((d) => d.isToday) ?? currentWeek.days[0]
+    const todayDay = currentWeek.days.find((d) => isDayToday(d)) ?? currentWeek.days[0]
     if (todayDay) {
       const daySource = todayTodos
       if (daySource?.length && hasEmptyTierItems(todayDay.items)) {

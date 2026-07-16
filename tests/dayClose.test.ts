@@ -17,6 +17,7 @@ import {
   dayCloseStreak,
   dayKey,
   getDayClose,
+  groupGoalHighlights,
   loadDayCloses,
   readChatPersonaLite,
   removeDayClose,
@@ -68,9 +69,9 @@ describe('dayCloseStreak — 돌아오는 리듬', () => {
 })
 
 describe('buildClosingMessage — 미래의 나 마감 인사', () => {
-  it('전부 해낸 날은 알아봐준다', () => {
-    const msg = buildClosingMessage({ done: 3, total: 3, mood: '뿌듯해' })
-    expect(msg).toContain('3개 전부 해냈네')
+  it('전부 해낸 날은 개수를 근거로 알아봐준다 (어느 변주든)', () => {
+    const msg = buildClosingMessage({ done: 3, total: 3, mood: '뿌듯해', date: '2026-07-17' })
+    expect(msg).toContain('3개')
   })
 
   it('하나도 못 한 날은 다그치지 않고, 내가 쓴 편지·미달 패턴으로 일으킨다', () => {
@@ -80,27 +81,69 @@ describe('buildClosingMessage — 미래의 나 마감 인사', () => {
       mood: '아쉬워',
       adviceLine: '너무 완벽하려 하지 마. 지금 속도면 충분해.',
       fearedPattern: '시작만 하고 흐지부지되는 나',
+      date: '2026-07-17',
     })
-    expect(msg).toContain('나도 그런 날 많았어')
+    expect(msg).toContain('나도 그런 날')
     expect(msg).toContain('흐지부지되는 나')
     expect(msg).toContain('지금 속도면 충분해')
     expect(msg).not.toContain('반성') // 죄책감 유발 금지
   })
 
   it('일부만 한 날은 남은 걸 내일과 나눈다', () => {
-    const msg = buildClosingMessage({ done: 1, total: 3, mood: '덤덤해' })
-    expect(msg).toContain('3개 중 1개')
-    expect(msg).toContain('내일의 나랑 나눠 들자')
+    const msg = buildClosingMessage({ done: 1, total: 3, mood: '덤덤해', date: '2026-07-17' })
+    expect(msg).toContain('1개')
+    expect(msg).toContain('내일')
   })
 
   it('계획이 없던 날도 끊긴 게 아니다', () => {
-    const msg = buildClosingMessage({ done: 0, total: 0, mood: '덤덤해' })
-    expect(msg).toContain('계획이 없던 날')
+    const msg = buildClosingMessage({ done: 0, total: 0, mood: '덤덤해', date: '2026-07-17' })
+    expect(msg).toContain('계획')
   })
 
   it('3일 이상 연속이면 리듬을 짚어준다', () => {
-    const msg = buildClosingMessage({ done: 2, total: 2, mood: '뿌듯해', streak: 4 })
+    const msg = buildClosingMessage({ done: 2, total: 2, mood: '뿌듯해', streak: 4, date: '2026-07-17' })
     expect(msg).toContain('4일째')
+  })
+
+  it('같은 날은 같은 문장 — 다시 열어도 인사가 바뀌지 않는다', () => {
+    const ctx = { done: 2, total: 3, mood: '덤덤해', date: '2026-07-18' } as const
+    expect(buildClosingMessage(ctx)).toBe(buildClosingMessage(ctx))
+  })
+
+  it('목표로 간 걸음은 일상과 구분해서 콕 집어준다', () => {
+    const msg = buildClosingMessage({
+      done: 2,
+      total: 2,
+      mood: '뿌듯해',
+      date: '2026-07-17',
+      goalHighlights: [{ title: '앱스토어 출시', done: 1, total: 1 }],
+    })
+    expect(msg).toContain('"앱스토어 출시" 쪽으로 오늘 1걸음')
+  })
+
+  it('일상만 챙긴 날엔 목표를 다그치지 않고 내일로 잇는다', () => {
+    const msg = buildClosingMessage({
+      done: 1,
+      total: 2,
+      mood: '덤덤해',
+      date: '2026-07-17',
+      goalHighlights: [{ title: '앱스토어 출시', done: 0, total: 1 }],
+    })
+    expect(msg).toContain('"앱스토어 출시"은 오늘 쉬었네')
+    expect(msg).toContain('일상을 챙긴 것도 진짜 일이야')
+  })
+})
+
+describe('groupGoalHighlights — 목표별 묶기', () => {
+  it('같은 목표의 항목을 묶고 완료 많은 순으로 정렬한다', () => {
+    const groups = groupGoalHighlights([
+      { title: 'A', done: false },
+      { title: 'B', done: true },
+      { title: 'A', done: true },
+      { title: 'B', done: true },
+    ])
+    expect(groups[0]).toEqual({ title: 'B', done: 2, total: 2 })
+    expect(groups[1]).toEqual({ title: 'A', done: 1, total: 2 })
   })
 })
 

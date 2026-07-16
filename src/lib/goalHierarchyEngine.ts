@@ -293,14 +293,29 @@ function focusFromLines(lines: string[], fallback = ''): string {
   return lines.find((s) => s.trim())?.trim() ?? fallback
 }
 
+const DOW_KR = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+/**
+ * '오늘' 판정은 항상 실시간으로 한다.
+ * 저장된 day.isToday는 목표를 만든 날 기준으로 박제돼서, 날짜가 바뀌어도
+ * 옛날 날짜에 "오늘" 배지가 남는 버그가 있었다.
+ */
+export function isDayToday(day: Pick<PlanDay, 'dateLabel' | 'dayOfWeek'>, now = new Date()): boolean {
+  return day.dateLabel === fmtShort(now) && day.dayOfWeek === DOW_KR[now.getDay()]
+}
+
 export function getCurrentWeek(h: GoalHierarchy): PlanWeekHierarchy | undefined {
-  return h.weeks.find((w) => w.id === h.currentWeekId) ?? h.weeks[0]
+  return (
+    h.weeks.find((w) => w.days.some((d) => isDayToday(d))) ??
+    h.weeks.find((w) => w.id === h.currentWeekId) ??
+    h.weeks[0]
+  )
 }
 
 export function getTodayDay(h: GoalHierarchy): PlanDay | undefined {
-  if (h.horizon === 'day-only') return h.days.find((d) => d.isToday) ?? h.days[0]
+  if (h.horizon === 'day-only') return h.days.find((d) => isDayToday(d)) ?? h.days[0]
   for (const w of h.weeks) {
-    const t = w.days.find((d) => d.isToday)
+    const t = w.days.find((d) => isDayToday(d))
     if (t) return t
   }
   return getCurrentWeek(h)?.days[0]

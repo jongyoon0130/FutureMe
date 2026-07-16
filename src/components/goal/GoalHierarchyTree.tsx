@@ -3,6 +3,7 @@ import type { GoalHierarchy, GoalHorizon, GoalPlan, PlanDay, PlanMonthNode, Plan
 import {
   getCurrentWeek,
   getTodayDay,
+  isDayToday,
   monthIconFromKey,
   tierHeadline,
   weeksForMonth,
@@ -169,13 +170,13 @@ function DayBlock({
   const headline = tierHeadline(day.items, '오늘 이룰 목표')
 
   return (
-    <div className={`goal-tree-day ${open ? 'open' : ''} ${day.isToday ? 'today' : ''}`}>
+    <div className={`goal-tree-day ${open ? 'open' : ''} ${isDayToday(day) ? 'today' : ''}`}>
       <button type="button" className="goal-tree-day-head" onClick={onToggle}>
         <span className="goal-tree-icon d">{day.dateLabel.split('/')[1] ?? '·'}</span>
         <div className="goal-tree-head-text">
           <strong>
             {day.dayOfWeek} · {day.dateLabel}
-            {day.isToday ? <em className="goal-tree-now">오늘</em> : null}
+            {isDayToday(day) ? <em className="goal-tree-now">오늘</em> : null}
           </strong>
           <span>{headline}</span>
         </div>
@@ -290,13 +291,13 @@ export function GoalHierarchyTree({ plan, horizon, onPersist }: Props) {
       <div className="goal-tree">
         <SecLabel>{label}</SecLabel>
         {h.days.map((day) => (
-          <div key={day.id} className={`goal-tree-day flat ${day.isToday ? 'today' : ''}`}>
+          <div key={day.id} className={`goal-tree-day flat ${isDayToday(day) ? 'today' : ''}`}>
             <div className="goal-tree-day-head static">
               <span className="goal-tree-icon d">{day.dateLabel.split('/')[1] ?? '·'}</span>
               <div className="goal-tree-head-text">
                 <strong>
                   {day.dayOfWeek} · {day.dateLabel}
-                  {day.isToday ? <em className="goal-tree-now">오늘</em> : null}
+                  {isDayToday(day) ? <em className="goal-tree-now">오늘</em> : null}
                 </strong>
               </div>
             </div>

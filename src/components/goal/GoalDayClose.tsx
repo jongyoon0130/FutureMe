@@ -5,6 +5,7 @@ import {
   buildClosingMessage,
   dayCloseStreak,
   dayKey,
+  groupGoalHighlights,
   loadDayCloses,
   readChatPersonaLite,
   removeDayClose,
@@ -21,6 +22,8 @@ interface Props {
   total: number
   /** 미달 패턴(본인 표현)을 찾기 위한 목표 목록 */
   plans: GoalPlan[]
+  /** 오늘의 목표 연결 항목들 — 마감 인사가 목표와 일상을 구분해 말하게 */
+  goalItems?: { title: string; done: boolean }[]
   /** 마감 후 미래의 나에게 이어 말하기 (채팅 프리필) */
   onTellFuture?: (prompt: string) => void
 }
@@ -30,7 +33,7 @@ interface Props {
  * 못 한 날에는 사용자가 직접 쓴 편지·미달 답변을 근거로, 다그치지 않고 일으킨다.
  * 기록은 언제든 고치고 지울 수 있다 — 내 기록의 주인은 나다.
  */
-export function GoalDayClose({ ownerId, selectedDate, done, total, plans, onTellFuture }: Props) {
+export function GoalDayClose({ ownerId, selectedDate, done, total, plans, goalItems = [], onTellFuture }: Props) {
   const [records, setRecords] = useState<DayCloseRecord[]>(() => loadDayCloses(ownerId))
   const [formOpen, setFormOpen] = useState(false)
   const [mood, setMood] = useState<string>(DAY_CLOSE_MOODS[0])
@@ -73,6 +76,8 @@ export function GoalDayClose({ ownerId, selectedDate, done, total, plans, onTell
         adviceLine: persona.adviceLine,
         fearedPattern,
         streak,
+        goalHighlights: groupGoalHighlights(goalItems),
+        date: selectedKey,
       }),
       closedAt: Date.now(),
     }

@@ -101,7 +101,9 @@ export function updateMiscTodoLabel(
 }
 
 function toAggregated(items: MiscTodoItem[]): AggregatedItem[] {
-  return items.map((it) => ({
+  return items
+    .filter((it) => it.label.trim())
+    .map((it) => ({
     id: it.id,
     label: it.label,
     done: it.done,

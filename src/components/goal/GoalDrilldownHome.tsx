@@ -356,20 +356,21 @@ export function GoalDrilldownHome({
                   const u = toggleAggregatedItem(plans, it.planId, it.id, key)
                   if (u) persist(u)
                 }}
-                onRemove={() => {
-                  if (it.planId === MISC_PLAN_ID) {
-                    setMiscTodos(removeMiscTodo(profile.id, miscTodos, it.id))
-                    return
-                  }
-                  const u = removeAggregatedItem(plans, it.planId, it.id, key)
-                  if (u) persist(u)
-                }}
                 onLabelChange={(label) => {
                   if (it.planId === MISC_PLAN_ID) {
                     setMiscTodos(updateMiscTodoLabel(profile.id, miscTodos, it.id, label))
                     return
                   }
                   const u = updateAggregatedItemLabel(plans, it.planId, it.id, key, label)
+                  if (u) persist(u)
+                }}
+                onLabelCommit={(label) => {
+                  if (label.trim()) return
+                  if (it.planId === MISC_PLAN_ID) {
+                    setMiscTodos(removeMiscTodo(profile.id, miscTodos, it.id))
+                    return
+                  }
+                  const u = removeAggregatedItem(plans, it.planId, it.id, key)
                   if (u) persist(u)
                 }}
                 onDrill={it.planId === MISC_PLAN_ID ? undefined : () => openTierFromHome(it.planId, key)}

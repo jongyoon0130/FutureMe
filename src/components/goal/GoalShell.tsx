@@ -281,6 +281,7 @@ export function GoalCheckRow({
   onRemove,
   onDrill,
   onLabelChange,
+  onLabelCommit,
 }: {
   done: boolean
   goalName?: string
@@ -289,8 +290,14 @@ export function GoalCheckRow({
   onRemove?: () => void
   onDrill?: () => void
   onLabelChange?: (label: string) => void
+  onLabelCommit?: (label: string) => void
 }) {
   const [editing, setEditing] = useState(false)
+
+  const finishEditing = () => {
+    onLabelCommit?.(text)
+    setEditing(false)
+  }
 
   const row = (
     <div className={`goal-chk-row ${done ? 'done' : ''}`}>
@@ -314,7 +321,13 @@ export function GoalCheckRow({
               value={text}
               autoFocus
               onChange={(e) => onLabelChange(e.target.value)}
-              onBlur={() => setEditing(false)}
+              onBlur={finishEditing}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  finishEditing()
+                }
+              }}
               onPointerDown={(e) => e.stopPropagation()}
             />
           ) : (

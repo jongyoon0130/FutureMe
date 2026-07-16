@@ -37,6 +37,7 @@ function seedPlan(overrides: Record<string, unknown> = {}): void {
     intake: { goal: '포트폴리오', deadline: '2026-10-15', successCriteria: '', progress: 'not_started' },
     motivation: {
       'why-truth': '성장이 멈춘 느낌이고, 실력을 증명하고 싶어서',
+      'success-both': '가볍게 숨 쉬고 자신감이 생긴다',
       'failure-pattern': '시작만 하고 흐지부지되는 내가 반복될 것 같아',
     },
     sections: [],
@@ -78,13 +79,59 @@ describe('daysUntilDeadline', () => {
 })
 
 describe('describeGoalBoardForPrompt — 프롬프트 요약', () => {
-  it('목표·D-day·동기(본인 표현)를 요약한다', () => {
+  it('목표·D-day·동기 3문항을 요약한다', () => {
     seedPlan()
     const out = describeGoalBoardForPrompt(NOW)
     expect(out).toContain('포트폴리오 완성해서 이직하기')
     expect(out).toContain('D-91')
     expect(out).toContain('실력을 증명하고 싶어서')
+    expect(out).toContain('가볍게 숨 쉬고 자신감이 생긴다')
     expect(out).toContain('흐지부지되는 내가 반복될 것 같아')
+  })
+
+  it('오늘·주·월 할 일 항목과 완료 여부를 나열한다', () => {
+    const owner = seedOwner()
+    const plan = {
+      id: 'plan-1',
+      profileId: owner,
+      templateType: 'backplan',
+      title: '앱 출시',
+      intake: { goal: '앱', deadline: '2026-12-01', successCriteria: '', progress: 'not_started' },
+      sections: [],
+      createdAt: '2026-07-16T00:00:00.000Z',
+      updatedAt: '2026-07-16T00:00:00.000Z',
+      hierarchy: {
+        horizon: 'day-only',
+        rangeLabel: '7월',
+        focus: '앱 출시',
+        startDate: '2026-07-01',
+        deadline: '2026-07-31',
+        months: [],
+        weeks: [],
+        days: [
+          {
+            id: 'd1',
+            dateLabel: '7/16',
+            dayOfWeek: '목',
+            focus: '',
+            items: [{ id: 't1', label: '스케줄표 업데이트', done: false }],
+          },
+        ],
+        currentWeekId: '',
+      },
+    }
+    localStorage.setItem(`goal-plans-${owner}`, JSON.stringify([plan]))
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([
+        { id: 'm1', label: '운동', done: true, tier: 'daily', periodKey: '2026-07-16' },
+      ]),
+    )
+
+    const out = describeGoalBoardForPrompt(NOW)
+    expect(out).toContain('오늘 할 일')
+    expect(out).toContain('앱 출시 — 스케줄표 업데이트')
+    expect(out).toContain('[완료] 일상 — 운동')
   })
 
   it('마감이 지난 목표는 지난 일수로 표기한다', () => {

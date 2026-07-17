@@ -270,8 +270,7 @@ export function GoalDrilldownHome({
   const todayStr = isTodaySelected
     ? `${now.getMonth() + 1}월 ${now.getDate()}일`
     : `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일`
-  const allCount = countItems([...aggregated.daily, ...aggregated.weekly, ...aggregated.monthly])
-  // 하루 마감의 근거 = "오늘 할 일" (목표 일간 + 일상 투두)
+  // 배터리·날짜 옆 진행률 = "오늘 할 일"만 (목표 일간 + 일상 투두)
   const dailyCount = countItems([...aggregated.daily, ...miscAgg.daily])
   // 타임캡슐 — 목표를 만들 때 쓴 "이뤘을 때" 답변이, 다 이뤘거나 마감일이 온 날 편지로 도착
   const timeCapsules = plans.filter((p) => {
@@ -287,16 +286,9 @@ export function GoalDrilldownHome({
     (day: number) => {
       const date = new Date(calYear, calMonth, day, 12, 0, 0, 0)
       const goalAgg = aggregateForDate(plans, date)
-      const miscAgg = miscAggregatedForDate(miscTodos, date)
-      const all = [
-        ...goalAgg.daily,
-        ...goalAgg.weekly,
-        ...goalAgg.monthly,
-        ...miscAgg.daily,
-        ...miscAgg.weekly,
-        ...miscAgg.monthly,
-      ]
-      const { done, total } = countItems(all)
+      const miscAggForDay = miscAggregatedForDate(miscTodos, date)
+      const dailyOnly = [...goalAgg.daily, ...miscAggForDay.daily]
+      const { done, total } = countItems(dailyOnly)
       const inRange =
         plans.some((p) => p.hierarchy && resolveDateSlots(p.hierarchy, date).inRange) || total > 0
       if (!total) return { done: 0, total: 0, pct: 0, inRange }
@@ -311,7 +303,7 @@ export function GoalDrilldownHome({
       <div className="goal-scroll">
         <p className="goal-home-title">{isTodaySelected ? '오늘' : '선택한 날'}</p>
         <p className="goal-home-sub">
-          {todayStr} · {allCount.done}/{allCount.total}
+          {todayStr} · {dailyCount.done}/{dailyCount.total}
         </p>
         <MiniCalendar
           year={calYear}

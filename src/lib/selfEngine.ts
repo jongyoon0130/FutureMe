@@ -1364,6 +1364,7 @@ ${CONCRETIZATION_INTERVIEW_BAN}
 ${FILLER_OVERUSE_BAN}
 ${NO_ECHO_BAN}
 ${PROFILE_SURFACE_BAN}
+${lite ? '' : TODO_DIRECTIVE_GUIDE}
 
 ## 예시 (구조만 — 말투·어휘 복사 X)
 ${describeBehaviorExamples(lite)}
@@ -1825,6 +1826,58 @@ export function isSyntheticErrorReply(content: string): boolean {
   return /API|Google|Gemini|키|네트워크|한도|Flash-Lite|503|429|잠깐 —/i.test(t)
 }
 
+// ---------------------------------------------------------------------------
+// 채팅 → 계획표: 일정 추가 지시문
+//
+// user가 "일정에 적어줘"라고 부탁하면 모델이 답변 끝에 기계용 한 줄을 붙인다.
+// 그 줄은 화면에 보이지 않고 **확인 카드**가 되어, user가 눌러야 실제로 저장된다.
+// (모델이 임의로 사용자 계획표에 쓰는 일은 없다 — 제안하고, 사람이 확정한다)
+// ---------------------------------------------------------------------------
+
+export type ChatTodoDirective = { date: string; title: string }
+
+/** 채팅 응답 — 보여줄 본문 + (있으면) 일정 추가 제안 */
+export type AiReply = { text: string; todo: ChatTodoDirective | null }
+
+const TODO_DIRECTIVE_RE = /\[\[\s*TODO\s*(\{[\s\S]*?\})\s*\]\]/
+
+/** 답변 원문에서 지시문을 떼어내고, 유효할 때만 todo를 돌려준다 */
+export function extractTodoDirective(
+  raw: string,
+  now = new Date(),
+): { text: string; todo: ChatTodoDirective | null } {
+  const match = raw.match(TODO_DIRECTIVE_RE)
+  if (!match) return { text: raw, todo: null }
+
+  const text = raw.replace(TODO_DIRECTIVE_RE, '').trim()
+  try {
+    const data = JSON.parse(match[1]) as { date?: unknown; title?: unknown }
+    const date = typeof data.date === 'string' ? data.date.trim() : ''
+    const title = typeof data.title === 'string' ? data.title.trim() : ''
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !title) return { text, todo: null }
+
+    const target = new Date(`${date}T12:00:00`)
+    if (Number.isNaN(target.getTime())) return { text, todo: null }
+    const base = new Date(now)
+    base.setHours(12, 0, 0, 0)
+    const diff = Math.round((target.getTime() - base.getTime()) / 86400000)
+    // 상식 범위 밖(과거·먼 미래)이면 모델이 날짜를 잘못 잡은 것 — 버린다
+    if (diff < -1 || diff > 60) return { text, todo: null }
+
+    return { text, todo: { date, title: title.slice(0, 60) } }
+  } catch {
+    return { text, todo: null }
+  }
+}
+
+const TODO_DIRECTIVE_GUIDE = `
+## 일정 추가 (부탁받았을 때만)
+- user가 "일정에 적어줘 / 넣어줘 / 추가해줘"처럼 **명시적으로 부탁**할 때만, 답변 **맨 끝**에 딱 한 줄:
+  [[TODO {"date":"YYYY-MM-DD","title":"제목"}]]
+- 날짜는 위 '지금' 시각 기준으로 계산한다 (내일·모레·이번 주 토요일 등). 시간이 있으면 제목에 넣는다 — 예: "풋살 (오후 1–3시)".
+- 이 줄은 user에게 **보이지 않고 확인 카드로 바뀐다**. 그러니 "넣어뒀어"라고 단정하지 말고 **"이거 맞으면 넣을게"** 톤으로 말한다.
+- 부탁하지 않았으면 절대 붙이지 않는다. 한 번에 하나만.`
+
 export type ApiDialogueMessage = {
   role: 'user' | 'assistant'
   content: string
@@ -2219,7 +2272,7 @@ export async function fetchAIResponse(
   model: string = DEFAULT_GEMINI_MODEL,
   replyPlan?: ChatReplyPlanInput,
   mode: ReplyMode = 'future',
-): Promise<string> {
+): Promise<AiReply> {
   const resolvedModel = resolveModel(model)
   const apiMessages = replyPlan
     ? [
@@ -2301,10 +2354,12 @@ export async function fetchAIResponse(
       )
 
       const raw = extractGeminiText(data)
-      const text = raw
-        ? stripFactualSearchBleed(enforceReplyLimits(raw, lastUser?.content))
+      // 지시문은 문장 다듬기(3문장 제한 등) 전에 떼어낸다 — 안 그러면 잘려 나간다
+      const { text: body, todo } = extractTodoDirective(raw ?? '')
+      const text = body
+        ? stripFactualSearchBleed(enforceReplyLimits(body, lastUser?.content))
         : ''
-      if (text) return text
+      if (text) return { text, todo }
       if (attempt === 0) {
         console.info('[FutureMe/Gemini] retry chatReply (empty response)')
         await sleep(1000)

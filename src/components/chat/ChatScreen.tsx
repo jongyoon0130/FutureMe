@@ -32,7 +32,7 @@ import {
   shouldUseLitePrompt,
   suggestSmallAction,
 } from '../../lib/selfEngine'
-import type { ApiCheckResult } from '../../lib/selfEngine'
+import type { ApiCheckResult, ChatTodoDirective } from '../../lib/selfEngine'
 import {
   loadChatAsync,
   saveChat,
@@ -54,6 +54,7 @@ import {
 import { addSavedDilemma, addSmallAction } from '../../lib/growthStore'
 import { addMiscTodo, loadMiscTodos } from '../../lib/goalMiscTodos'
 import { getGoalAppOwnerId } from '../../lib/goalAppOwner'
+import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
 
 function readInitialApiStatus(): 'idle' | ApiCheckResult {
   const key = loadApiKey()?.trim() ?? ''
@@ -67,6 +68,20 @@ function maskApiKeyDisplay(key: string): string {
   if (!key) return ''
   if (key.length <= 4) return '•'.repeat(key.length)
   return `···${key.slice(-4)}`
+}
+
+/** 일정 확인 카드용 날짜 표기 — "내일 (7/18 토)" */
+function formatTodoDate(date: string, now = new Date()): string {
+  const d = new Date(`${date}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return date
+  const base = new Date(now)
+  base.setHours(12, 0, 0, 0)
+  const diff = Math.round((d.getTime() - base.getTime()) / 86400000)
+  const label = `${d.getMonth() + 1}/${d.getDate()} ${['일', '월', '화', '수', '목', '금', '토'][d.getDay()]}`
+  if (diff === 0) return `오늘 (${label})`
+  if (diff === 1) return `내일 (${label})`
+  if (diff === 2) return `모레 (${label})`
+  return label
 }
 
 function fallbackSmallActionEncouragement(action: string): string {
@@ -113,6 +128,14 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     onProfileUpdate(next)
     saveProfileRecord(next)
   }
+
+  /**
+   * 항상 최신 self — 배경 작업(요약·인사이트 분석)은 await 뒤에 실행돼서
+   * 클로저의 self가 낡을 수 있다. setSelf 업데이터 안에서 저장·부모 알림을 하면
+   * React가 렌더 중 실행해 경고를 내므로, ref로 최신값을 읽고 밖에서 persistSelf 한다.
+   */
+  const selfRef = useRef(self)
+  selfRef.current = self
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatReady, setChatReady] = useState(false)
   const [importStatus, setImportStatus] = useState<'idle' | 'ok' | 'fail'>('idle')
@@ -160,6 +183,8 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   /** 이번 채팅 세션에서 API 실패 직후에만 표시 (나갔다 들어오면 안 뜸) */
   const [retryBannerMsgId, setRetryBannerMsgId] = useState<string | null>(null)
+  /** 미래의 나가 제안한 일정 — user가 눌러야 실제로 계획표에 들어간다 */
+  const [pendingTodo, setPendingTodo] = useState<ChatTodoDirective | null>(null)
 
   const exitSelectMode = () => {
     setSelectMode(false)
@@ -269,14 +294,9 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
       }))
       const found = await analyzeInsightsWithAI(recent, key, resolveModel(loadModel()))
       if (found.length) {
-        setSelf((prev) => {
-          let ins = prev.insights ?? []
-          for (const c of found) ins = mergeInsight(ins, { ...c, source: 'ai' })
-          const updated: SelfProfile = { ...prev, insights: ins }
-          saveProfileRecord(updated)
-          onProfileUpdate(updated)
-          return updated
-        })
+        let ins = selfRef.current.insights ?? []
+        for (const c of found) ins = mergeInsight(ins, { ...c, source: 'ai' })
+        persistSelf({ ...selfRef.current, insights: ins })
       }
     } catch {
       /* 분석 실패는 조용히 무시 */
@@ -302,15 +322,10 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
         try {
           const sumResult = await updateConversationSummary(profile, history, key, mdl)
           if (!sumResult) return
-          setSelf((prev) => {
-            const updated: SelfProfile = {
-              ...prev,
-              conversationSummary: sumResult.summary,
-              summarizedMessageCount: sumResult.summarizedMessageCount,
-            }
-            saveProfileRecord(updated)
-            onProfileUpdate(updated)
-            return updated
+          persistSelf({
+            ...selfRef.current,
+            conversationSummary: sumResult.summary,
+            summarizedMessageCount: sumResult.summarizedMessageCount,
           })
         } catch {
           /* 요약 실패는 조용히 무시 */
@@ -400,18 +415,14 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
       source: 'chat',
       at: Date.now(),
     }
-    setSelf((prev) => {
-      const samples = [...prev.styleSamples, sample].slice(-MAX_SAMPLES)
-      const insights = accumulateInsights(prev.insights ?? [], text)
-      const updated: SelfProfile = {
-        ...prev,
-        styleSamples: samples,
-        styleRules: extractStyleRules(samples),
-        insights,
-      }
-      saveProfileRecord(updated)
-      onProfileUpdate(updated)
-      return updated
+    // 저장·부모 알림을 setSelf 업데이터 안에서 하면 React가 렌더 중에 실행해
+    // 경고를 내고(StrictMode에선 두 번 저장된다) — 밖에서 계산하고 persistSelf로 한 번에.
+    const samples = [...selfRef.current.styleSamples, sample].slice(-MAX_SAMPLES)
+    persistSelf({
+      ...selfRef.current,
+      styleSamples: samples,
+      styleRules: extractStyleRules(samples),
+      insights: accumulateInsights(selfRef.current.insights ?? [], text),
     })
   }
 
@@ -467,12 +478,15 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
         content: m.content,
         timestamp: m.timestamp,
       }))
-      reply = await fetchAIResponse(profileForAI, history, key, mdl, {
+      const res = await fetchAIResponse(profileForAI, history, key, mdl, {
         contextMessages: plan.contextMessages,
         focusContent: plan.focusContent,
         focusTimestamp: plan.focusTimestamp,
         focusInstruction: plan.focusInstruction,
       })
+      reply = res.text
+      // 일정 추가 제안이 왔으면 확인 카드로 — 저장은 user가 누를 때만
+      if (res.todo) setPendingTodo(res.todo)
       chatOk = true
       setLastUsageTick(Date.now())
     } catch (e) {
@@ -625,6 +639,23 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     setTimeout(() => setToast(null), 1600)
   }
 
+  /** 제안된 일정을 실제 계획표(홈)에 넣는다 */
+  const confirmPendingTodo = () => {
+    if (!pendingTodo) return
+    const owner = getGoalAppOwnerId()
+    addMiscTodo(
+      owner,
+      loadMiscTodos(owner),
+      'daily',
+      new Date(`${pendingTodo.date}T12:00:00`),
+      pendingTodo.title,
+    )
+    // 홈 탭이 이미 떠 있어도 새로 읽도록 알림
+    window.dispatchEvent(new Event(GOAL_DATA_SYNC_EVENT))
+    setPendingTodo(null)
+    flashToast('계획표에 추가됨 📅')
+  }
+
   const lastUserMessage = () => [...messages].reverse().find((m) => m.role === 'user') ?? null
 
   const saveLastUserAsDilemma = () => {
@@ -692,20 +723,22 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
           content: m.content,
           timestamp: m.timestamp,
         }))
-        reply = await fetchAIResponse(
-          self,
-          history,
-          key,
-          mdl,
-          {
-            contextMessages: history.slice(0, -1),
-            focusContent: action,
-            focusTimestamp: userMsg.timestamp,
-            focusInstruction:
-              'user가 방금 \'작은 행동\'으로 위 한 줄을 정했다. 이미 정한 행동이니 다시 제안하지 말고, 내 말투로 짧게 밀어줘. 행동명을 작은따옴표+대시로 되따라치지 말 것. 행동과 안 맞는 "5분" 같은 시간은 붙이지 말 것.',
-          },
-          'courage',
-        )
+        reply = (
+          await fetchAIResponse(
+            self,
+            history,
+            key,
+            mdl,
+            {
+              contextMessages: history.slice(0, -1),
+              focusContent: action,
+              focusTimestamp: userMsg.timestamp,
+              focusInstruction:
+                'user가 방금 \'작은 행동\'으로 위 한 줄을 정했다. 이미 정한 행동이니 다시 제안하지 말고, 내 말투로 짧게 밀어줘. 행동명을 작은따옴표+대시로 되따라치지 말 것. 행동과 안 맞는 "5분" 같은 시간은 붙이지 말 것.',
+            },
+            'courage',
+          )
+        ).text
       } catch {
         /* fallback 유지 */
       } finally {
@@ -1168,6 +1201,32 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
             >
               ✕
             </button>
+          </div>
+        ) : null}
+        {pendingTodo ? (
+          <div className="px-3 pt-2.5 pb-1.5 border-b border-border/40 bg-accent/5">
+            <p className="text-[11px] text-muted mb-1.5">계획표에 이거 넣을까?</p>
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 min-w-0 px-2.5 py-2 rounded-xl bg-surface border border-accent/30">
+                <p className="text-[12px] text-ink truncate">{pendingTodo.title}</p>
+                <p className="text-[11px] text-muted mt-0.5">{formatTodoDate(pendingTodo.date)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={confirmPendingTodo}
+                className="shrink-0 px-3 py-2 rounded-xl bg-accent text-surface text-[12px] font-medium"
+              >
+                추가
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingTodo(null)}
+                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-ink/5 transition-colors"
+                aria-label="일정 추가 취소"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         ) : null}
       {messages.length > 0 && (

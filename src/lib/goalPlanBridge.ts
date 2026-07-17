@@ -248,6 +248,50 @@ function formatTaskTier(title: string, items: AggregatedItem[]): string[] {
   return lines
 }
 
+/** 프롬프트에 싣는 앞날 범위 — "내일 뭐 있지?"에 답하려면 오늘만으론 부족하다 */
+const UPCOMING_DAYS = 7
+const DOW_KR = ['일', '월', '화', '수', '목', '금', '토'] as const
+
+function noonMs(d: Date): number {
+  const x = new Date(d)
+  x.setHours(12, 0, 0, 0)
+  return x.getTime()
+}
+
+function relativeDayLabel(d: Date, now: Date): string {
+  const diff = Math.round((noonMs(d) - noonMs(now)) / 86400000)
+  const base = `${d.getMonth() + 1}/${d.getDate()}(${DOW_KR[d.getDay()]})`
+  if (diff === 0) return `오늘 ${base}`
+  if (diff === 1) return `내일 ${base}`
+  if (diff === 2) return `모레 ${base}`
+  return base
+}
+
+/** 특정 날짜의 일간 항목 (목표 트리 + 일상 투두) */
+function dailyItemsForDate(plans: GoalPlan[], misc: MiscTodoItem[], date: Date): AggregatedItem[] {
+  return [...aggregateForDate(plans, date).daily, ...miscAggregatedLite(misc, date).daily]
+}
+
+/**
+ * 오늘부터 며칠 앞까지의 일정.
+ * 오늘·내일은 비어 있어도 "없음"이라고 명시한다 — 데이터가 없으면 AI가
+ * 마음대로 "없네"라고 단정해버리기 때문에, 없다는 사실 자체를 알려줘야 한다.
+ */
+function upcomingDayLines(plans: GoalPlan[], misc: MiscTodoItem[], now: Date): string[] {
+  const lines: string[] = []
+  for (let i = 0; i <= UPCOMING_DAYS; i++) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + i)
+    const items = dailyItemsForDate(plans, misc, d)
+    if (!items.length) {
+      if (i <= 1) lines.push(`${relativeDayLabel(d, now)}: 등록된 할 일 없음`)
+      continue
+    }
+    lines.push(...formatTaskTier(relativeDayLabel(d, now), items))
+  }
+  return lines
+}
+
 function aggregateHomeBoard(now: Date): {
   daily: AggregatedItem[]
   weekly: AggregatedItem[]
@@ -267,18 +311,21 @@ function aggregateHomeBoard(now: Date): {
 
 /**
  * 미래의 나 프롬프트용 홈 계획표 전체 요약.
- * 최종 목표·동기 3문항·오늘/주/월 할 일(항목별 완료 여부)을 포함한다.
+ * 최종 목표·동기 3문항 + 오늘부터 일주일 일정(날짜별, 항목별 완료 여부) + 주/월 목표.
  */
 export function describeGoalBoardForPrompt(now = new Date()): string {
   const plans = readGoalPlansLite()
+  const owner = readOwnerId()
+  const misc = owner ? readMiscTodosLite(owner) : []
   const board = aggregateHomeBoard(now)
-  const hasTasks = board.daily.length + board.weekly.length + board.monthly.length > 0
+  const dayLines = upcomingDayLines(plans, misc, now)
   const hasPlans = plans.some((p) => p.title?.trim())
+  const hasTasks = board.weekly.length + board.monthly.length > 0 || misc.length > 0
 
   if (!hasPlans && !hasTasks) return ''
 
   const lines: string[] = []
-  const dateLabel = `${now.getMonth() + 1}월 ${now.getDate()}일`
+  const dateLabel = `${now.getMonth() + 1}월 ${now.getDate()}일(${DOW_KR[now.getDay()]})`
   lines.push(`홈 계획표 (${dateLabel} 기준)`)
 
   for (const plan of plans.slice(0, MAX_PLANS)) {
@@ -293,9 +340,9 @@ export function describeGoalBoardForPrompt(now = new Date()): string {
     lines.push(`…외 최종 목표 ${plans.length - MAX_PLANS}개`)
   }
 
-  lines.push(...formatTaskTier('오늘 할 일', board.daily))
-  lines.push(...formatTaskTier('이번 주', board.weekly))
-  lines.push(...formatTaskTier('이번 달', board.monthly))
+  lines.push(...dayLines)
+  lines.push(...formatTaskTier('이번 주 목표', board.weekly))
+  lines.push(...formatTaskTier('이번 달 목표', board.monthly))
 
   lines.push(...historyLines(now))
 

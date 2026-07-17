@@ -129,9 +129,42 @@ describe('describeGoalBoardForPrompt — 프롬프트 요약', () => {
     )
 
     const out = describeGoalBoardForPrompt(NOW)
-    expect(out).toContain('오늘 할 일')
+    expect(out).toContain('오늘 7/16(목)') // 날짜별 라벨 — "내일" 질문에도 답할 수 있게
     expect(out).toContain('앱 출시 — 스케줄표 업데이트')
     expect(out).toContain('[완료] 일상 — 운동')
+  })
+
+  it('내일 이후 일정도 날짜별로 싣는다 — "내일 뭐 있지?"에 답할 수 있게', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([
+        { id: 'm1', label: '오늘 운동', done: true, tier: 'daily', periodKey: '2026-07-16' },
+        { id: 'm2', label: '저녁 8시 약속', done: false, tier: 'daily', periodKey: '2026-07-17' },
+        { id: 'm3', label: '주말 정리', done: false, tier: 'daily', periodKey: '2026-07-19' },
+        { id: 'm4', label: '한참 뒤 일', done: false, tier: 'daily', periodKey: '2026-08-30' },
+      ]),
+    )
+
+    const out = describeGoalBoardForPrompt(NOW) // 2026-07-16
+    expect(out).toContain('오늘 7/16(목)')
+    expect(out).toContain('[완료] 일상 — 오늘 운동')
+    expect(out).toContain('내일 7/17(금)')
+    expect(out).toContain('저녁 8시 약속')
+    expect(out).toContain('7/19(일)')
+    expect(out).toContain('주말 정리')
+    expect(out).not.toContain('한참 뒤 일') // 일주일 범위 밖
+  })
+
+  it('오늘·내일이 비면 "없음"이라고 명시한다 — AI가 멋대로 단정하지 않게', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'm1', label: '나중 일', done: false, tier: 'daily', periodKey: '2026-07-20' }]),
+    )
+    const out = describeGoalBoardForPrompt(NOW)
+    expect(out).toContain('오늘 7/16(목): 등록된 할 일 없음')
+    expect(out).toContain('내일 7/17(금): 등록된 할 일 없음')
   })
 
   it('마감이 지난 목표는 지난 일수로 표기한다', () => {

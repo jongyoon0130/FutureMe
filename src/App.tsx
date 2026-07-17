@@ -4,7 +4,7 @@ import { ChatOnboarding } from './components/onboarding/ChatOnboarding'
 import { ChatScreen } from './components/chat/ChatScreen'
 import { ProfileListScreen } from './components/list/ProfileListScreen'
 import { HomeScreen } from './components/home/HomeScreen'
-import { ScheduleScreen } from './components/schedule/ScheduleScreen'
+import { ProfileScreen } from './components/profile/ProfileScreen'
 import { AppShell } from './components/nav/AppShell'
 import { DEFAULT_MAIN_TAB, type MainTab } from './components/nav/types'
 import { AuthScreen } from './components/auth/AuthScreen'
@@ -35,6 +35,12 @@ export default function App() {
   const { configured, loading: authLoading, syncing, session } = useAuth()
   const cloudPushFailing = useSyncExternalStore(subscribeCloudPushStatus, isCloudPushFailing)
   const [activeTab, setActiveTab] = useState<MainTab>(DEFAULT_MAIN_TAB)
+  // 탭 전환 때마다 증가 — 프로필 탭이 최신 데이터를 다시 읽게 하는 신호
+  const [navSeq, setNavSeq] = useState(0)
+  const changeTab = useCallback((tab: MainTab) => {
+    setNavSeq((n) => n + 1)
+    setActiveTab(tab)
+  }, [])
   const [screen, setScreen] = useState<Screen>('list')
   const [summaries, setSummaries] = useState<ProfileSummary[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
@@ -89,6 +95,21 @@ export default function App() {
   const handleProfileUpdate = (next: SelfProfile) => {
     saveProfileRecord(next)
     setProfile(next)
+  }
+
+  const startOnboarding = () => {
+    const saved = loadOnboardingProgress<{ version?: number; stepIdx?: number }>()
+    if (saved?.version === ONBOARDING_PROGRESS_VERSION && saved.stepIdx && saved.stepIdx > 0) {
+      const resume = window.confirm(
+        '진행 중인 만들기가 저장돼 있어요.\n\n확인 → 이어서 만들기\n취소 → 처음부터 새로 만들기',
+      )
+      if (resume) {
+        setScreen('onboarding')
+        return
+      }
+    }
+    clearOnboardingProgress()
+    setScreen('onboarding')
   }
 
   const handleBackFromChat = () => {
@@ -193,26 +214,13 @@ export default function App() {
       <div className="relative h-full">
         <AppShell
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={changeTab}
           showNav={screen === 'list'}
           chat={
             <ProfileListScreen
               summaries={summaries}
               onSelect={openProfile}
-              onCreateNew={() => {
-                const saved = loadOnboardingProgress<{ version?: number; stepIdx?: number }>()
-                if (saved?.version === ONBOARDING_PROGRESS_VERSION && saved.stepIdx && saved.stepIdx > 0) {
-                  const resume = window.confirm(
-                    '진행 중인 만들기가 저장돼 있어요.\n\n확인 → 이어서 만들기\n취소 → 처음부터 새로 만들기',
-                  )
-                  if (resume) {
-                    setScreen('onboarding')
-                    return
-                  }
-                }
-                clearOnboardingProgress()
-                setScreen('onboarding')
-              }}
+              onCreateNew={startOnboarding}
               onRestoreBackup={handleRestoreBackup}
               onDelete={handleDeleteProfile}
             />
@@ -229,7 +237,17 @@ export default function App() {
               }}
             />
           }
-          schedule={<ScheduleScreen />}
+          profile={
+            <ProfileScreen
+              refreshKey={navSeq}
+              onOpenChat={(id) => {
+                setActiveTab('chat')
+                openProfile(id)
+              }}
+              onOpenHome={() => changeTab('home')}
+              onCreate={startOnboarding}
+            />
+          }
         />
 
         {screen === 'onboarding' && (

@@ -2382,3 +2382,6 @@ html, body, #root {
 .goal-dayclose-manage button:hover {
   color: var(--goal-ink, #3a4048);
 }
+
+/* 탭 페이저: 홈이 활성이 아닐 때, 홈의 fixed FAB가 다른 탭에 비쳐 보이지 않게 */
+.tab-panel-inactive .goal-fab { display: none !important; }

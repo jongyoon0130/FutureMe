@@ -41,7 +41,7 @@ function HomeIcon({ active }: { active: boolean }) {
   )
 }
 
-function ScheduleIcon({ active }: { active: boolean }) {
+function ProfileIcon({ active }: { active: boolean }) {
   return (
     <svg
       width="22"
@@ -54,8 +54,8 @@ function ScheduleIcon({ active }: { active: boolean }) {
       strokeLinejoin="round"
       aria-hidden
     >
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M20 21a8 8 0 0 0-16 0" />
+      <circle cx="12" cy="7" r="4" />
     </svg>
   )
 }
@@ -63,7 +63,7 @@ function ScheduleIcon({ active }: { active: boolean }) {
 const TABS: { id: MainTab; label: string; Icon: typeof ChatIcon }[] = [
   { id: 'chat', label: '채팅', Icon: ChatIcon },
   { id: 'home', label: '홈', Icon: HomeIcon },
-  { id: 'schedule', label: '스케줄', Icon: ScheduleIcon },
+  { id: 'profile', label: '프로필', Icon: ProfileIcon },
 ]
 
 export function BottomNav({ active, onChange }: Props) {

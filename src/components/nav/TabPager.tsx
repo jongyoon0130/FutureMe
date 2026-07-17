@@ -7,16 +7,16 @@ interface Props {
   enabled: boolean
   chat: ReactNode
   home: ReactNode
-  schedule: ReactNode
+  profile: ReactNode
 }
 
 const TAB_INDEX: Record<MainTab, number> = {
   chat: 0,
   home: 1,
-  schedule: 2,
+  profile: 2,
 }
 
-export function TabPager({ active, onChange, enabled, chat, home, schedule }: Props) {
+export function TabPager({ active, onChange, enabled, chat, home, profile }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const widthRef = useRef(0)
   const scrollRafRef = useRef<number | null>(null)
@@ -73,7 +73,7 @@ export function TabPager({ active, onChange, enabled, chat, home, schedule }: Pr
       <div className="h-full overflow-hidden">
         {active === 'chat' && chat}
         {active === 'home' && home}
-        {active === 'schedule' && schedule}
+        {active === 'profile' && profile}
       </div>
     )
   }
@@ -85,9 +85,12 @@ export function TabPager({ active, onChange, enabled, chat, home, schedule }: Pr
       className="tab-pager h-full flex overflow-x-auto snap-x snap-mandatory overscroll-x-contain"
       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
     >
+      {/* tab-panel-inactive: 다른 탭에 있을 때 홈의 fixed FAB가 비쳐 보이지 않게 (goal-app.css) */}
       <div className="w-full shrink-0 snap-center h-full overflow-hidden">{chat}</div>
-      <div className="w-full shrink-0 snap-center h-full overflow-hidden">{home}</div>
-      <div className="w-full shrink-0 snap-center h-full overflow-hidden">{schedule}</div>
+      <div className={`w-full shrink-0 snap-center h-full overflow-hidden${active === 'home' ? '' : ' tab-panel-inactive'}`}>
+        {home}
+      </div>
+      <div className="w-full shrink-0 snap-center h-full overflow-hidden">{profile}</div>
     </div>
   )
 }

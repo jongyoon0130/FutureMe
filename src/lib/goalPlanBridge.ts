@@ -130,6 +130,28 @@ export function achievedPlans(plans: GoalPlan[]): GoalPlan[] {
   })
 }
 
+/** 아직 다 이루지 않은 목표 + D-day — "지금 향하는 것" */
+export function activeGoalsLite(now = new Date()): { title: string; dday: number | null }[] {
+  return readGoalPlansLite()
+    .filter((p) => {
+      const { done, total } = planProgress(p)
+      return !(total > 0 && done === total)
+    })
+    .map((p) => ({
+      title: p.title,
+      dday: p.intake?.deadline ? daysUntilDeadline(p.intake.deadline, now) : null,
+    }))
+}
+
+/** 전체 완료 개수 — 목표 트리 체크 + 일상 할 일. "시간의 해자"를 숫자로. */
+export function totalDoneCount(): number {
+  let n = 0
+  const owner = readOwnerId()
+  if (owner) n += readMiscTodosLite(owner).filter((t) => t.done).length
+  for (const p of readGoalPlansLite()) n += planProgress(p).done
+  return n
+}
+
 /** 최근 N일 동안 실제 완료한 홈 '오늘 할 일' 개수 (periodKey가 날짜라 정확) */
 export function recentMiscDoneCount(days = 7, now = new Date()): number {
   try {

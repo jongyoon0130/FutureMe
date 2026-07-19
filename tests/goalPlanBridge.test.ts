@@ -16,6 +16,9 @@ globalThis.localStorage = new MemoryStorage()
 import {
   daysUntilDeadline,
   describeGoalBoardForPrompt,
+  buildScheduleAnswerFacts,
+  asksScheduleQuestion,
+  scheduleQuestionScope,
   readGoalPlansLite,
   todayMiscProgress,
 } from '../src/lib/goalPlanBridge'
@@ -244,5 +247,64 @@ describe('todayMiscProgress — 오늘 할 일 진행', () => {
 
     localStorage.setItem(`goal-misc-todos-${owner}`, JSON.stringify([]))
     expect(todayMiscProgress(NOW)).toBeNull()
+  })
+})
+
+describe('buildScheduleAnswerFacts — 일정 질문 환각 방지', () => {
+  const SUN = new Date('2026-07-19T12:00:00')
+
+  it('오늘 질문엔 일간만 — 이번 주 목표·시간 추측 금지', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'm1', label: '풋살', done: false, tier: 'daily', periodKey: '2026-07-19' }]),
+    )
+    localStorage.setItem(
+      `goal-plans-${owner}`,
+      JSON.stringify([
+        {
+          id: 'plan-1',
+          profileId: owner,
+          templateType: 'backplan',
+          title: '앱스토어에 어플 출시',
+          intake: { goal: '앱', deadline: '2026-12-01', successCriteria: '', progress: 'not_started' },
+          sections: [],
+          createdAt: '2026-07-01T00:00:00.000Z',
+          updatedAt: '2026-07-01T00:00:00.000Z',
+          hierarchy: {
+            horizon: 'week-month',
+            rangeLabel: '7월',
+            focus: '앱',
+            startDate: '2026-07-01',
+            deadline: '2026-07-31',
+            months: [],
+            weeks: [
+              {
+                id: 'w1',
+                label: '3주차',
+                dateLabel: '7/13-7/19',
+                focus: '',
+                items: [{ id: 'witem', label: '미래의 나 페르소나 구축', done: false }],
+                days: [],
+              },
+            ],
+            days: [],
+            currentWeekId: 'w1',
+          },
+        },
+      ]),
+    )
+
+    expect(scheduleQuestionScope('오늘 일정 뭐 적어놨어')).toBe('today')
+    const facts = buildScheduleAnswerFacts('오늘 일정 뭐 적어놨어', SUN)
+    expect(facts).toContain('풋살')
+    expect(facts).toContain('시간 미기재')
+    expect(facts).not.toContain('페르소나')
+    expect(facts).not.toContain('앱스토어 릴리즈')
+  })
+
+  it('일정 질문이 아니면 null', () => {
+    expect(asksScheduleQuestion('오늘 좀 힘들었어')).toBe(false)
+    expect(buildScheduleAnswerFacts('오늘 좀 힘들었어', SUN)).toBeNull()
   })
 })

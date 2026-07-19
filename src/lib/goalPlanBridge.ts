@@ -268,8 +268,83 @@ function relativeDayLabel(d: Date, now: Date): string {
 }
 
 /** 특정 날짜의 일간 항목 (목표 트리 + 일상 투두) */
-function dailyItemsForDate(plans: GoalPlan[], misc: MiscTodoItem[], date: Date): AggregatedItem[] {
+export function dailyItemsForDate(plans: GoalPlan[], misc: MiscTodoItem[], date: Date): AggregatedItem[] {
   return [...aggregateForDate(plans, date).daily, ...miscAggregatedLite(misc, date).daily]
+}
+
+/** user가 일정·할 일을 물어봤는지 */
+export function asksScheduleQuestion(text: string): boolean {
+  const t = text.replace(/\s+/g, ' ').trim()
+  if (t.length < 3) return false
+  const scheduleWord = /(일정|할\s?일|해야\s?(?:할|해)|계획|스케줄|목록|체크)/
+  const askWord =
+    /(뭐\s?(?:있|해|하|냐|야|지)|알려|말해|확인|맞|틀|거짓|지어내|최신|정보|뭐\s?적|적었)/
+  const timeWord = /(오늘|금일|내일|모레|이번\s?주|주간|이번\s?달|월간|지금)/
+  if (scheduleWord.test(t) && (askWord.test(t) || timeWord.test(t))) return true
+  if (timeWord.test(t) && /(뭐\s?(?:해|하|있)|뭐야|뭐지)/.test(t)) return true
+  return false
+}
+
+/** 오늘/내일 등 — 일간 일정 질문의 범위 */
+export function scheduleQuestionScope(text: string): 'today' | 'tomorrow' | 'general' | null {
+  const t = text.replace(/\s+/g, ' ').trim()
+  if (!asksScheduleQuestion(t)) return null
+  if (/(내일|tomorrow)/i.test(t)) return 'tomorrow'
+  if (/(오늘|금일|지금)/.test(t)) return 'today'
+  return 'general'
+}
+
+/**
+ * 일정 질문 턴에 넣는 **사실만** 블록.
+ * 모델이 이번 주 목표·대화 맥락·시간을 지어내지 않게 한다.
+ */
+export function buildScheduleAnswerFacts(userMessage: string, now = new Date()): string | null {
+  const scope = scheduleQuestionScope(userMessage)
+  if (!scope) return null
+
+  const plans = readGoalPlansLite()
+  const owner = readOwnerId()
+  const misc = owner ? readMiscTodosLite(owner) : []
+
+  const date = new Date(now)
+  if (scope === 'tomorrow') date.setDate(date.getDate() + 1)
+
+  if (scope === 'general') {
+    const dayLines = upcomingDayLines(plans, misc, now)
+    return [
+      '## 일정 질문 — 사실만 (지어내기·대화 추측 금지)',
+      '아래 **날짜별 일간** 목록만 근거로 답할 것. 목록에 없는 항목·시간·날짜는 금지.',
+      'user가 "오늘"만 물으면 **오늘** 줄만. "이번 주/달 목표"는 일간 일정이 아님 — 섞지 말 것.',
+      '항목 라벨에 시간이 없으면 **시간·장소 언급 금지**.',
+      ...dayLines,
+    ].join('\n')
+  }
+
+  const items = dailyItemsForDate(plans, misc, date)
+  const dayLabel = relativeDayLabel(date, now)
+
+  if (!items.length) {
+    return [
+      '## 일정 질문 — 사실만 (지어내기·대화 추측 금지)',
+      `${dayLabel}: 등록된 **일간** 할 일 없음.`,
+      '- "이번 주 목표"/"이번 달 목표"는 **오늘·내일 일간 일정이 아님** — user가 그걸 묻지 않았으면 섞지 말 것.',
+      '- 시간·장소·미룬 이유(배 아픔 등) **추가 금지**.',
+    ].join('\n')
+  }
+
+  const itemLines = items.map((it) => {
+    const hasTimeHint = /\d|시\b|오전|오후|am|pm/i.test(it.label)
+    const timeNote = hasTimeHint ? '' : ' (시간 미기재 — 시간 말하지 말 것)'
+    return `- ${it.done ? '[완료]' : '[ ]'} ${clip(it.planTitle, 24)} — ${clip(it.label, 60)}${timeNote}`
+  })
+
+  return [
+    '## 일정 질문 — 사실만 (지어내기·대화 추측 금지)',
+    `${dayLabel} **일간** 할 일 (이것만 답할 것):`,
+    ...itemLines,
+    '- 위 목록 **밖** 항목·시간·날짜·이유 **추가 금지**. 틀렸으면 짧게 인정하고 위 목록만 다시 말할 것.',
+    '- "이번 주/달 목표"는 user가 그걸 물을 때만 — 오늘/내일 일정 질문에 넣지 말 것.',
+  ].join('\n')
 }
 
 /**

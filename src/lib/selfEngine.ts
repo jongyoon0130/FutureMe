@@ -12,7 +12,7 @@ import { formatApiTurnTimestamp, nowContextKo } from './chatDisplay'
 import { FUTURE_YEARS_AHEAD } from './brand'
 import { renderFutureSelfBlock, personaGaps } from './personaModel'
 import { dateKey, overdueTasks, recentReflectionsWithTask, stalledGoals } from './plannerStore'
-import { describeGoalBoardForPrompt } from './goalPlanBridge'
+import { describeGoalBoardForPrompt, buildScheduleAnswerFacts } from './goalPlanBridge'
 
 // ---------------------------------------------------------------------------
 // L1: Big Five 점수 계산
@@ -1250,7 +1250,12 @@ export function buildSystemPrompt(
           : emptyAnalysis('casual'))
 
   const reg = analysis.primaryRegister
+  const scheduleFacts = userMessage ? buildScheduleAnswerFacts(userMessage) : null
+  const scheduleAsk = Boolean(scheduleFacts)
   const situation = buildAnalysisGuide(analysis)
+  const scheduleGuide = scheduleAsk
+    ? 'user가 **일정·할 일**을 물었다 — 아래 "일정 질문 — 사실만" 블록 **만** 근거로 답할 것. 이번 주/달 목표·대화 추측·시간 지어내기 금지.'
+    : ''
   const deep = !lite && userMessage ? needsDeepContext(userMessage, reg) : false
   const concretizing =
     analysis.vague || analysis.inConcretizationFlow || analysis.needs.includes('concretize')
@@ -1265,20 +1270,29 @@ export function buildSystemPrompt(
   const growthCtx = deep ? describeGrowthContext(p) : ''
   const growthSection = growthCtx ? `\n## 성장 축 (참고 — 매 턴 낭독 금지)\n${growthCtx}` : ''
 
-  const rhythm = lite ? '' : describeExecutionRhythm(p)
+  const rhythm = lite && !scheduleAsk ? '' : describeExecutionRhythm(p)
+  const scheduleSection = scheduleFacts ? `\n${scheduleFacts}` : ''
   const rhythmSection = rhythm
-    ? `\n## 내 계획표 · 실행 리듬 (아래가 사실 — 지어내지 말 것)\n${rhythm}
-→ **일정 질문엔 즉답**: "오늘/내일 뭐 있지", "일정 뭐야" 같은 걸 물으면 위 목록을 **근거로** 구체적으로 답한다 (제목 그대로, 완료 여부 포함). 위에 "등록된 할 일 없음"이라고 적힌 날만 없다고 말하고, **목록에 없는 날짜·일정은 절대 지어내지 않는다** (모르면 "그날은 아직 안 적어놨네").
+    ? `\n## 내 계획표 · 실행 리듬 (아래가 사실 — 지어내지 말 것)\n${rhythm}${scheduleSection}
+→ **일정 질문엔 즉답**: "오늘/내일 뭐 있지", "일정 뭐야" 같은 걸 물으면 **"일정 질문 — 사실만" 블록**과 위 날짜별 **일간** 목록만 근거로 답한다 (제목 그대로, 완료 여부 포함). **이번 주/달 목표는 오늘·내일 일정이 아님.** 항목에 시간이 없으면 시간 말하지 말 것. 목록에 없는 날짜·일정·이유는 절대 지어내지 않는다.
 → **평소엔**: 이번 user 말과 연결될 때만. 해낸 기록은 **먼저 알아봐주고 같이 반가워해도 좋다** ("지난번에 ~ 했잖아"). 멈춘 목표·밀린 할 일은 **대화당 최대 한 번**, user가 먼저 꺼내거나 흐름이 닿을 때만 — "나도 그런 주 있었어" 톤으로. 다그침·죄책감 유발·숙제 검사 금지.
 → **몸 상태·급한 일이 먼저**: user가 아프거나 급한 일이 생겼다고 하면 계획표는 접어두고 그것부터 받는다. 남은 할 일을 들이밀지 말 것.`
-    : ''
+    : scheduleSection
+      ? scheduleSection
+      : ''
 
   const personaGap = lite ? undefined : personaGaps(p, 1)[0]
   const gapSection = personaGap
     ? `\n## 아직 못 들은 것 (선택)\n- "${personaGap.question}"\n→ 대화가 가볍고 한가할 때만, 이번 대화 통틀어 최대 한 번 지나가듯 물어봐도 된다. user가 힘든 얘기 중이면 금지. 답은 기억해두면 된다.`
     : ''
 
-  const answerStructure = concretizing
+  const answerStructure = scheduleAsk
+    ? `## 답변 구조 (일정 질문)
+- **"일정 질문 — 사실만" 블록**만 읽고 답할 것. 항목명·완료 여부 그대로.
+- 오늘/내일 질문이면 **일간** 목록만. 이번 주·달 목표 섞지 말 것.
+- 시간·장소·미룬 이유는 **항목에 적혀 있을 때만**. 없으면 언급 금지.
+- 틀렸다면 변명·재추측 없이 짧게 인정 + 목록만 다시.`
+    : concretizing
     ? `## 답변 구조 (지금은 구체화 단계)
 - user 말·상황이 **아직 흐림**. 이번 턴 **판단·결론·행동 과제 금지**.
 - 아래 **1개만**: (1) 짧게 받아주기 0~1문장 + (2) 방금 말에서 갈라지는 **가지·장면·trigger 하나** 좁히기
@@ -1354,7 +1368,7 @@ ${analysis.vague || analysis.inConcretizationFlow ? '- **구체화 단계** — 
 ${analysis.requiresExternalData ? '- 외부 정보가 필요한 질문일 수 있음. 최신 숫자·시세는 지어내지 말 것.' : ''}
 
 ## 이번 턴 가이드
-- ${situation}${growthTouchLine}
+- ${scheduleGuide || situation}${scheduleGuide ? `\n- ${situation}` : ''}${growthTouchLine}
 ${antiRepeat}
 
 ${answerStructure}

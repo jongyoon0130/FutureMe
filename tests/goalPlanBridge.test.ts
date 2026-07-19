@@ -318,3 +318,30 @@ describe('stripInventedTimes — 최후의 안전망 (할루시네이션 최우�
     expect(auditReplyAgainstKnownFacts('풋살 있네', NOW).ok).toBe(true)
   })
 })
+
+describe('describeKnownFactsBlock compact(lite) — 내일 일정 누락 회귀 방지', () => {
+  it('lite 모드라도 내일 일정을 싣는다 (긴 대화에서 "내일 뭐 있지?")', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([
+        { id: 'w', label: '새벽 4시 월드컵 결승 시청', done: false, tier: 'daily', periodKey: '2026-07-17' },
+      ]),
+    )
+    // NOW = 2026-07-16, 내일 = 07-17
+    const compact = describeKnownFactsBlock(NOW, true)
+    expect(compact).toContain('내일 7/17')
+    expect(compact).toContain('월드컵')
+  })
+
+  it('lite 모드에서 오늘·내일이 비면 "없음" 명시', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'x', label: '한참 뒤', done: false, tier: 'daily', periodKey: '2026-07-25' }]),
+    )
+    const compact = describeKnownFactsBlock(NOW, true)
+    expect(compact).toContain('오늘 7/16(목): 등록된 일간 할 일 없음')
+    expect(compact).toContain('내일 7/17(금): 등록된 일간 할 일 없음')
+  })
+})

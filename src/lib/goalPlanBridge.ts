@@ -372,11 +372,17 @@ export function describeKnownFactsBlock(now = new Date(), compact = false): stri
   if (!hasPlans && !hasTasks) return ''
 
   if (compact) {
-    const today = dailyItemsForDate(plans, misc, now)
-    const todayLines = today.length
-      ? formatTaskTier(relativeDayLabel(now, now), today)
-      : [`${relativeDayLabel(now, now)}: 등록된 일간 할 일 없음`]
-    return [GROUNDING_PREAMBLE, ...todayLines].join('\n')
+    // lite 모드라도 오늘~모레는 싣는다 — "내일 뭐 있지?"에 답할 수 있게.
+    // (오늘·내일은 비어도 "없음"을 명시해 모델이 멋대로 단정하지 않게)
+    const lines: string[] = []
+    for (let i = 0; i <= 2; i++) {
+      const d = new Date(now)
+      d.setDate(d.getDate() + i)
+      const items = dailyItemsForDate(plans, misc, d)
+      if (items.length) lines.push(...formatTaskTier(relativeDayLabel(d, now), items))
+      else if (i <= 1) lines.push(`${relativeDayLabel(d, now)}: 등록된 일간 할 일 없음`)
+    }
+    return [GROUNDING_PREAMBLE, ...lines].join('\n')
   }
 
   return [GROUNDING_PREAMBLE, describeGoalBoardBody(now)].filter(Boolean).join('\n')

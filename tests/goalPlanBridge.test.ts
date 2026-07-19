@@ -17,6 +17,7 @@ import {
   daysUntilDeadline,
   describeGoalBoardForPrompt,
   describeKnownFactsBlock,
+  stripInventedTimes,
   auditReplyAgainstKnownFacts,
   readGoalPlansLite,
   todayMiscProgress,
@@ -281,5 +282,39 @@ describe('fact grounding — 할루시네이션 방지', () => {
       JSON.stringify([{ id: 'm1', label: '운동', done: false, tier: 'daily', periodKey: '2026-07-16' }]),
     )
     expect(describeGoalBoardForPrompt(NOW)).toContain('알고 있는 것')
+  })
+})
+
+describe('stripInventedTimes — 최후의 안전망 (할루시네이션 최우선)', () => {
+  it('데이터에 시간이 없으면, 답변의 지어낸 시간을 지운다', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'm1', label: '풋살', done: false, tier: 'daily', periodKey: '2026-07-16' }]),
+    )
+    const out = stripInventedTimes('오후 6시부터 8시까지 풋살 잡혀 있는 거 확인했어.', NOW)
+    expect(out).not.toContain('6시')
+    expect(out).not.toContain('8시')
+    expect(out).toContain('풋살')
+  })
+
+  it('데이터에 실제 시간이 있으면 건드리지 않는다', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'm1', label: '풋살 (오후 1-3시)', done: false, tier: 'daily', periodKey: '2026-07-16' }]),
+    )
+    const out = stripInventedTimes('오후 1시부터 3시까지 풋살이야.', NOW)
+    expect(out).toContain('1시')
+  })
+
+  it('auditReplyAgainstKnownFacts: 데이터에 없는 시간이 답변에 있으면 invented_time', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'm1', label: '풋살', done: false, tier: 'daily', periodKey: '2026-07-16' }]),
+    )
+    expect(auditReplyAgainstKnownFacts('오후 6시에 풋살이야', NOW).ok).toBe(false)
+    expect(auditReplyAgainstKnownFacts('풋살 있네', NOW).ok).toBe(true)
   })
 })

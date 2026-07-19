@@ -321,17 +321,40 @@ export function collectKnownFactCorpus(now = new Date()): string {
 const TIME_IN_TEXT =
   /\d{1,2}\s*:\s*\d{2}|\d{1,2}\s*시(?:\s*~\s*\d{1,2}\s*시)?|오후\s*\d{1,2}|오전\s*\d{1,2}|\b(?:am|pm)\b/i
 
-/** 모델 답변에 데이터에 없는 시간 등이 섞였는지 */
+/**
+ * 모델 답변에 데이터에 없는 시간 등이 섞였는지.
+ * allow = user가 방금 한 말(+추가 요청 제목) — 유저 본인이 말한 시간은 지어낸 게 아니다.
+ */
 export function auditReplyAgainstKnownFacts(
   text: string,
   now = new Date(),
+  allow = '',
 ): { ok: boolean; reason?: 'invented_time' } {
-  const corpus = collectKnownFactCorpus(now)
+  const corpus = `${collectKnownFactCorpus(now)} ${allow}`
   if (!corpus.trim() || !text.trim()) return { ok: true }
   if (TIME_IN_TEXT.test(text) && !TIME_IN_TEXT.test(corpus)) {
     return { ok: false, reason: 'invented_time' }
   }
   return { ok: true }
+}
+
+// 전역 매칭용 (지우개) — audit 판정용 TIME_IN_TEXT와 같은 패턴
+const TIME_IN_TEXT_G = new RegExp(TIME_IN_TEXT.source, 'gi')
+
+/**
+ * 최후의 안전망 — 재시도까지 했는데도 모델이 없는 시간을 고집하면,
+ * 앱이 직접 시간 표현을 지워서 거짓이 유저에게 닿지 않게 한다.
+ * (데이터에 시간이 있거나, user가 방금 그 시간을 말했으면 건드리지 않는다)
+ */
+export function stripInventedTimes(text: string, now = new Date(), allow = ''): string {
+  const corpus = `${collectKnownFactCorpus(now)} ${allow}`
+  if (TIME_IN_TEXT.test(corpus)) return text // 진짜 시간이 있으면 그대로
+  return text
+    .replace(/(오전|오후)\s*\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?(?:\s*(?:부터|~|-)\s*(?:오전|오후)?\s*\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?)?(?:\s*까지)?/g, '그 시간')
+    .replace(TIME_IN_TEXT_G, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,?!])/g, '$1')
+    .trim()
 }
 
 /**

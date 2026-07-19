@@ -12,7 +12,7 @@ import { formatApiTurnTimestamp, nowContextKo } from './chatDisplay'
 import { FUTURE_YEARS_AHEAD } from './brand'
 import { renderFutureSelfBlock, personaGaps } from './personaModel'
 import { dateKey, overdueTasks, recentReflectionsWithTask, stalledGoals } from './plannerStore'
-import { auditReplyAgainstKnownFacts, collectKnownFactCorpus, describeKnownFactsBlock } from './goalPlanBridge'
+import { auditReplyAgainstKnownFacts, collectKnownFactCorpus, describeKnownFactsBlock, stripInventedTimes } from './goalPlanBridge'
 
 // ---------------------------------------------------------------------------
 // L1: Big Five 점수 계산
@@ -2376,12 +2376,20 @@ export async function fetchAIResponse(
         ? stripFactualSearchBleed(enforceReplyLimits(body, lastUser?.content))
         : ''
       if (text) {
-        if (hasKnownFacts && !strictRetry) {
-          const audit = auditReplyAgainstKnownFacts(text)
+        if (hasKnownFacts) {
+          // user가 방금 말한 시간·추가 요청 제목은 지어낸 게 아니다 → 예외로 허용
+          const allow = `${lastUser?.content ?? ''} ${todo?.title ?? ''}`
+          const audit = auditReplyAgainstKnownFacts(text, new Date(), allow)
           if (!audit.ok) {
-            console.info('[FutureMe/Gemini] fact audit failed, retrying', audit.reason)
-            strictRetry = true
-            continue
+            if (!strictRetry) {
+              // 1차 실패 → 강한 지시 + 낮은 온도로 다시
+              console.info('[FutureMe/Gemini] fact audit failed, retrying', audit.reason)
+              strictRetry = true
+              continue
+            }
+            // 재시도까지 실패 → 앱이 직접 지운다. 거짓 시간은 절대 유저에게 안 보낸다.
+            console.info('[FutureMe/Gemini] fact audit failed again, stripping', audit.reason)
+            return { text: stripInventedTimes(text, new Date(), allow), todo }
           }
         }
         return { text, todo }

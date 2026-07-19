@@ -1173,6 +1173,30 @@ html, body, #root {
   margin-bottom: 2px;
 }
 
+.goal-app .goal-chk-goal-picker {
+  margin-bottom: 2px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.goal-app .goal-chk-goal-picker-btn {
+  max-width: 100%;
+  padding: 0 2px 0 0;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--goal-muted);
+}
+
+.goal-app .goal-chk-goal-picker-btn:hover {
+  color: var(--goal-accent);
+}
+
+.goal-app .goal-chk-goal-menu {
+  min-width: 160px;
+}
+
 .goal-app .goal-txt {
   font-size: 14px;
   font-weight: 400;

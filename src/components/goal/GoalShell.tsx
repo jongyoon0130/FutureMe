@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { GoalBatteryIcon } from './GoalBatteryIcon'
+import { GoalCategoryPicker, type GoalCategoryOption } from './GoalCategoryPicker'
 import { GoalSwipeDelete } from './GoalSwipeDelete'
 
 export function GoalShell({ children, embedded = false }: { children: ReactNode; embedded?: boolean }) {
@@ -282,6 +283,9 @@ export function GoalCheckRow({
   onDrill,
   onLabelChange,
   onLabelCommit,
+  categoryOptions,
+  categoryId,
+  onCategoryChange,
 }: {
   done: boolean
   goalName?: string
@@ -291,6 +295,9 @@ export function GoalCheckRow({
   onDrill?: () => void
   onLabelChange?: (label: string) => void
   onLabelCommit?: (label: string) => void
+  categoryOptions?: GoalCategoryOption[]
+  categoryId?: string
+  onCategoryChange?: (planId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(text)
@@ -321,7 +328,17 @@ export function GoalCheckRow({
         {done ? <CheckIcon /> : null}
       </button>
       <div className="goal-chk-body" style={{ flex: 1, minWidth: 0 }}>
-        {goalName ? <div className="goal-chk-goal">{goalName}</div> : null}
+        {categoryOptions && categoryId && onCategoryChange ? (
+          <GoalCategoryPicker
+            options={categoryOptions}
+            value={categoryId}
+            onChange={onCategoryChange}
+            className="goal-chk-goal-picker"
+            menuClassName="goal-chk-goal-menu"
+          />
+        ) : goalName ? (
+          <div className="goal-chk-goal">{goalName}</div>
+        ) : null}
         {onLabelChange ? (
           editing ? (
             <input

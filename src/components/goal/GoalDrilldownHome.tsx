@@ -44,6 +44,7 @@ import {
   upsertWeekItemLabel,
 } from '../../lib/goalHierarchyMutations'
 import { touchGoalPlan, deleteGoalPlan } from '../../lib/goalPlanStore'
+import { homeCategoryOptionsForTier, moveHomeAggregatedItem } from '../../lib/goalHomeCategoryMove'
 import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
 import { getRoutineWeekProgress, isRoutinePlan } from '../../lib/goalRoutineEngine'
 import { GoalEditPlanForm } from './GoalEditPlanForm'
@@ -184,6 +185,30 @@ export function GoalDrilldownHome({
   const persist = (next: GoalPlan) => {
     touchGoalPlan(next.profileId, next)
     onPlansChange(plans.map((p) => (p.id === next.id ? next : p)))
+  }
+
+  const persistAll = (nextPlans: GoalPlan[]) => {
+    for (const p of nextPlans) touchGoalPlan(p.profileId, p)
+    onPlansChange(nextPlans)
+  }
+
+  const handleCategoryChange = (
+    it: (typeof tierSections)[number]['list'][number],
+    tier: 'daily' | 'weekly' | 'monthly',
+    targetPlanId: string,
+  ) => {
+    const moved = moveHomeAggregatedItem({
+      plans,
+      miscTodos,
+      profileId: profile.id,
+      item: it,
+      tier,
+      date: selectedDate,
+      targetPlanId,
+    })
+    if (!moved) return
+    persistAll(moved.plans)
+    setMiscTodos(moved.miscTodos)
   }
 
   const pop = () => {
@@ -357,6 +382,9 @@ export function GoalDrilldownHome({
                 done={it.done}
                 goalName={it.planTitle}
                 text={it.label}
+                categoryOptions={homeCategoryOptionsForTier(eligiblePlans, key)}
+                categoryId={it.planId}
+                onCategoryChange={(targetPlanId) => handleCategoryChange(it, key, targetPlanId)}
                 onToggle={() => {
                   if (it.planId === MISC_PLAN_ID) {
                     setMiscTodos(toggleMiscTodo(profile.id, miscTodos, it.id))

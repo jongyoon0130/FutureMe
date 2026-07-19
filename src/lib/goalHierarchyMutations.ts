@@ -380,4 +380,126 @@ export function addTierGoalAtDate(
   return null
 }
 
+export function setAggregatedItemDone(
+  plan: GoalPlan,
+  itemId: string,
+  tier: 'daily' | 'weekly' | 'monthly',
+  done: boolean,
+): GoalPlan | null {
+  if (!plan.hierarchy) return null
+  const h = plan.hierarchy
+  const setDone = (it: PlanCheckItem): PlanCheckItem => ({ ...it, done })
+
+  if (tier === 'monthly') {
+    for (const m of h.months) {
+      if (m.items.some((i) => i.id === itemId)) {
+        return withHierarchy(plan, (hh) => ({
+          ...hh,
+          months: hh.months.map((month) =>
+            month.id !== m.id
+              ? month
+              : { ...month, items: mapItems(month.items, itemId, (it) => (done ? setDone(it) : { ...it, done: false })) },
+          ),
+        }))
+      }
+    }
+  }
+
+  if (tier === 'weekly') {
+    for (const w of h.weeks) {
+      if (w.items.some((i) => i.id === itemId)) {
+        return withHierarchy(plan, (hh) => ({
+          ...hh,
+          weeks: hh.weeks.map((week) =>
+            week.id !== w.id
+              ? week
+              : { ...week, items: mapItems(week.items, itemId, (it) => (done ? setDone(it) : { ...it, done: false })) },
+          ),
+        }))
+      }
+    }
+  }
+
+  if (tier === 'daily') {
+    if (h.horizon === 'day-only') {
+      for (const d of h.days) {
+        if (d.items.some((i) => i.id === itemId)) {
+          return withHierarchy(plan, (hh) => ({
+            ...hh,
+            days: hh.days.map((day) =>
+              day.id !== d.id
+                ? day
+                : { ...day, items: mapItems(day.items, itemId, (it) => (done ? setDone(it) : { ...it, done: false })) },
+            ),
+          }))
+        }
+      }
+    } else {
+      for (const w of h.weeks) {
+        for (const d of w.days) {
+          if (d.items.some((i) => i.id === itemId)) {
+            return withHierarchy(plan, (hh) => ({
+              ...hh,
+              weeks: hh.weeks.map((week) =>
+                week.id !== w.id
+                  ? week
+                  : {
+                      ...week,
+                      days: week.days.map((day) =>
+                        day.id !== d.id
+                          ? day
+                          : { ...day, items: mapItems(day.items, itemId, (it) => (done ? setDone(it) : { ...it, done: false })) },
+                      ),
+                    },
+              ),
+            }))
+          }
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+/** 홈에서 카테고리 옮길 때 — 새 항목을 추가하고 완료 상태를 유지한다 */
+export function insertTierGoalAtDate(
+  plan: GoalPlan,
+  date: Date,
+  tier: 'daily' | 'weekly' | 'monthly',
+  label: string,
+  done = false,
+): GoalPlan | null {
+  if (!plan.hierarchy || !label.trim()) return null
+  const slots = resolveDateSlots(plan.hierarchy, date)
+  if (!slots.inRange) return null
+
+  const trimmed = label.trim()
+  let next: GoalPlan | null = null
+  let itemId: string | undefined
+
+  if (tier === 'monthly' && slots.monthId) {
+    next = addMonthItem(plan, slots.monthId)
+    itemId = next.hierarchy!.months.find((m) => m.id === slots.monthId)?.items.at(-1)?.id
+    if (itemId) next = setMonthItemLabel(next, slots.monthId, itemId, trimmed)
+  } else if (tier === 'weekly' && slots.weekId) {
+    next = addWeekItem(plan, slots.weekId)
+    itemId = next.hierarchy!.weeks.find((w) => w.id === slots.weekId)?.items.at(-1)?.id
+    if (itemId) next = setWeekItemLabel(next, slots.weekId, itemId, trimmed)
+  } else if (tier === 'daily' && slots.dayId) {
+    next = addDayItem(plan, slots.dayWeekId, slots.dayId)
+    const h = next.hierarchy!
+    const day =
+      h.horizon === 'day-only'
+        ? h.days.find((d) => d.id === slots.dayId)
+        : h.weeks.find((w) => w.id === slots.weekId)?.days.find((d) => d.id === slots.dayId)
+    itemId = day?.items.at(-1)?.id
+    if (itemId) next = setDayItemLabel(next, slots.dayWeekId, slots.dayId, itemId, trimmed)
+  }
+
+  if (!next || !itemId) return null
+  if (done) return setAggregatedItemDone(next, itemId, tier, true) ?? next
+  return next
+}
+
 export { getCurrentWeek, horizonShowsMonth, horizonShowsWeek }

@@ -61,6 +61,17 @@ export function addMiscTodo(
   date: Date,
   label: string,
 ): MiscTodoItem[] {
+  return insertMiscTodo(profileId, items, tier, date, label, false)
+}
+
+export function insertMiscTodo(
+  profileId: string,
+  items: MiscTodoItem[],
+  tier: 'daily' | 'weekly' | 'monthly',
+  date: Date,
+  label: string,
+  done = false,
+): MiscTodoItem[] {
   const trimmed = label.trim()
   if (!trimmed) return items
   const next = [
@@ -68,7 +79,7 @@ export function addMiscTodo(
     {
       id: uid(),
       label: trimmed,
-      done: false,
+      done,
       tier,
       periodKey: periodKeyForTier(tier, date),
     },

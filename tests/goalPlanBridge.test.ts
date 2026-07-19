@@ -16,9 +16,8 @@ globalThis.localStorage = new MemoryStorage()
 import {
   daysUntilDeadline,
   describeGoalBoardForPrompt,
-  buildScheduleAnswerFacts,
-  asksScheduleQuestion,
-  scheduleQuestionScope,
+  describeKnownFactsBlock,
+  auditReplyAgainstKnownFacts,
   readGoalPlansLite,
   todayMiscProgress,
 } from '../src/lib/goalPlanBridge'
@@ -250,61 +249,37 @@ describe('todayMiscProgress — 오늘 할 일 진행', () => {
   })
 })
 
-describe('buildScheduleAnswerFacts — 일정 질문 환각 방지', () => {
+describe('fact grounding — 할루시네이션 방지', () => {
   const SUN = new Date('2026-07-19T12:00:00')
 
-  it('오늘 질문엔 일간만 — 이번 주 목표·시간 추측 금지', () => {
+  it('describeKnownFactsBlock은 compact에 오늘 일간만', () => {
     const owner = seedOwner()
     localStorage.setItem(
       `goal-misc-todos-${owner}`,
       JSON.stringify([{ id: 'm1', label: '풋살', done: false, tier: 'daily', periodKey: '2026-07-19' }]),
     )
-    localStorage.setItem(
-      `goal-plans-${owner}`,
-      JSON.stringify([
-        {
-          id: 'plan-1',
-          profileId: owner,
-          templateType: 'backplan',
-          title: '앱스토어에 어플 출시',
-          intake: { goal: '앱', deadline: '2026-12-01', successCriteria: '', progress: 'not_started' },
-          sections: [],
-          createdAt: '2026-07-01T00:00:00.000Z',
-          updatedAt: '2026-07-01T00:00:00.000Z',
-          hierarchy: {
-            horizon: 'week-month',
-            rangeLabel: '7월',
-            focus: '앱',
-            startDate: '2026-07-01',
-            deadline: '2026-07-31',
-            months: [],
-            weeks: [
-              {
-                id: 'w1',
-                label: '3주차',
-                dateLabel: '7/13-7/19',
-                focus: '',
-                items: [{ id: 'witem', label: '미래의 나 페르소나 구축', done: false }],
-                days: [],
-              },
-            ],
-            days: [],
-            currentWeekId: 'w1',
-          },
-        },
-      ]),
-    )
-
-    expect(scheduleQuestionScope('오늘 일정 뭐 적어놨어')).toBe('today')
-    const facts = buildScheduleAnswerFacts('오늘 일정 뭐 적어놨어', SUN)
-    expect(facts).toContain('풋살')
-    expect(facts).toContain('시간 미기재')
-    expect(facts).not.toContain('페르소나')
-    expect(facts).not.toContain('앱스토어 릴리즈')
+    const compact = describeKnownFactsBlock(SUN, true)
+    expect(compact).toContain('알고 있는 것')
+    expect(compact).toContain('풋살')
+    expect(compact).not.toContain('이번 주 목표')
   })
 
-  it('일정 질문이 아니면 null', () => {
-    expect(asksScheduleQuestion('오늘 좀 힘들었어')).toBe(false)
-    expect(buildScheduleAnswerFacts('오늘 좀 힘들었어', SUN)).toBeNull()
+  it('auditReplyAgainstKnownFacts — 데이터에 없는 시간을 잡는다', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'm1', label: '풋살', done: false, tier: 'daily', periodKey: '2026-07-19' }]),
+    )
+    expect(auditReplyAgainstKnownFacts('오늘 6시부터 8시 풋살이야', SUN).ok).toBe(false)
+    expect(auditReplyAgainstKnownFacts('오늘 풋살 하나 적혀 있어', SUN).ok).toBe(true)
+  })
+
+  it('describeGoalBoardForPrompt에 grounding preamble이 있다', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([{ id: 'm1', label: '운동', done: false, tier: 'daily', periodKey: '2026-07-16' }]),
+    )
+    expect(describeGoalBoardForPrompt(NOW)).toContain('알고 있는 것')
   })
 })

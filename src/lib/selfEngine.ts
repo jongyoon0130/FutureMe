@@ -12,7 +12,7 @@ import { formatApiTurnTimestamp, nowContextKo } from './chatDisplay'
 import { FUTURE_YEARS_AHEAD } from './brand'
 import { renderFutureSelfBlock, personaGaps } from './personaModel'
 import { dateKey, overdueTasks, recentReflectionsWithTask, stalledGoals } from './plannerStore'
-import { describeGoalBoardForPrompt, buildScheduleAnswerFacts } from './goalPlanBridge'
+import { auditReplyAgainstKnownFacts, collectKnownFactCorpus, describeKnownFactsBlock } from './goalPlanBridge'
 
 // ---------------------------------------------------------------------------
 // L1: Big Five 점수 계산
@@ -419,10 +419,9 @@ function describeGrowthContext(p: SelfProfile): string {
 }
 
 /**
- * 실행 리듬 — 플래너의 목표·완료 회고·멈춤·밀림을 미래의 나에게 알려준다.
- * (deep 턴이 아니어도 실림 — "지난주에 그거 해냈잖아"는 가벼운 대화에서 나와야 자연스럽다)
+ * 실행 리듬 — 플래너의 목표·완료 회고·멈춤·밀림 (홈 계획표는 describeKnownFactsBlock).
  */
-function describeExecutionRhythm(p: SelfProfile): string {
+function describePlannerRhythmOnly(p: SelfProfile): string {
   const lines: string[] = []
   const planner = p.planner
   const activeGoals = planner?.goals.filter((g) => g.status === 'active').slice(0, 2) ?? []
@@ -444,10 +443,6 @@ function describeExecutionRhythm(p: SelfProfile): string {
   if (overdue.length) {
     lines.push(`기한 지난 할 일 ${overdue.length}개 (예: "${overdue[0].title.slice(0, 40)}")`)
   }
-
-  // 홈 계획표(목표 앱)의 최종 목표·동기 — 읽기 전용 다리
-  const board = describeGoalBoardForPrompt()
-  if (board) lines.push(...board.split('\n'))
 
   return lines.map((l) => `- ${l}`).join('\n')
 }
@@ -709,6 +704,13 @@ const PROFILE_SURFACE_BAN = `
 - ❌ 온보딩·프로필(1순위·잘 산다·딜레마·MBTI)을 **이번 말과 무관하게** "~하잖아", "우리는 ~한 편", "~~ 성향도 있고"로 **아는 척·낭독**
 - ❌ 이번 고민을 **추상 성향·인생 철학**으로만 퉁치기 — user가 말한 **사람·상황·후회·타이밍**을 먼저
 - ✅ **지금 user가 말한 핵심**을 거울처럼 받아주고, **한 걸음 앞**(행동·기준·타이밍·선택)을 같은 나 톤으로 — 성향은 **라벨 없이** 자연스럽게 녹일 때만 OK`
+
+const FACT_GROUNDING_BAN = `
+## 사실·할루시네이션 (최우선)
+- **알고 있는 것** 블록·user 방금 말·온보딩에 **적힌 것만** 사실. 그 밖은 모름.
+- 시간·장소·날짜·할 일명·미룬 이유·"~했잖아"는 **블록에 글자 그대로 있을 때만**. 없으면 "적혀 있지 않아" / "시간은 안 적혀 있어".
+- **이전 대화·네 추측·그럴듯한 연결은 사실 아님.** user가 틀렸다고 하면 변명·재추측 없이 인정.
+- 이번 주/달 **목표**와 오늘 **일간** 할 일을 섞지 말 것.`
 
 /** 주가·시세 — 주식/환율 전용 (순위 '1위' 등과 분리) */
 const FACTUAL_STOCK_RE =
@@ -1250,12 +1252,7 @@ export function buildSystemPrompt(
           : emptyAnalysis('casual'))
 
   const reg = analysis.primaryRegister
-  const scheduleFacts = userMessage ? buildScheduleAnswerFacts(userMessage) : null
-  const scheduleAsk = Boolean(scheduleFacts)
   const situation = buildAnalysisGuide(analysis)
-  const scheduleGuide = scheduleAsk
-    ? 'user가 **일정·할 일**을 물었다 — 아래 "일정 질문 — 사실만" 블록 **만** 근거로 답할 것. 이번 주/달 목표·대화 추측·시간 지어내기 금지.'
-    : ''
   const deep = !lite && userMessage ? needsDeepContext(userMessage, reg) : false
   const concretizing =
     analysis.vague || analysis.inConcretizationFlow || analysis.needs.includes('concretize')
@@ -1270,15 +1267,14 @@ export function buildSystemPrompt(
   const growthCtx = deep ? describeGrowthContext(p) : ''
   const growthSection = growthCtx ? `\n## 성장 축 (참고 — 매 턴 낭독 금지)\n${growthCtx}` : ''
 
-  const rhythm = lite && !scheduleAsk ? '' : describeExecutionRhythm(p)
-  const scheduleSection = scheduleFacts ? `\n${scheduleFacts}` : ''
-  const rhythmSection = rhythm
-    ? `\n## 내 계획표 · 실행 리듬 (아래가 사실 — 지어내지 말 것)\n${rhythm}${scheduleSection}
-→ **일정 질문엔 즉답**: "오늘/내일 뭐 있지", "일정 뭐야" 같은 걸 물으면 **"일정 질문 — 사실만" 블록**과 위 날짜별 **일간** 목록만 근거로 답한다 (제목 그대로, 완료 여부 포함). **이번 주/달 목표는 오늘·내일 일정이 아님.** 항목에 시간이 없으면 시간 말하지 말 것. 목록에 없는 날짜·일정·이유는 절대 지어내지 않는다.
-→ **평소엔**: 이번 user 말과 연결될 때만. 해낸 기록은 **먼저 알아봐주고 같이 반가워해도 좋다** ("지난번에 ~ 했잖아"). 멈춘 목표·밀린 할 일은 **대화당 최대 한 번**, user가 먼저 꺼내거나 흐름이 닿을 때만 — "나도 그런 주 있었어" 톤으로. 다그침·죄책감 유발·숙제 검사 금지.
-→ **몸 상태·급한 일이 먼저**: user가 아프거나 급한 일이 생겼다고 하면 계획표는 접어두고 그것부터 받는다. 남은 할 일을 들이밀지 말 것.`
-    : scheduleSection
-      ? scheduleSection
+  const knownFacts = describeKnownFactsBlock(new Date(), lite)
+  const plannerRhythm = lite ? '' : describePlannerRhythmOnly(p)
+  const rhythmSection =
+    knownFacts || plannerRhythm
+      ? `\n${knownFacts}${plannerRhythm ? `\n\n### 실행 리듬 (참고 — 매 턴 언급 금지)\n${plannerRhythm}` : ''}
+→ **사실**: 위 "알고 있는 것"에 없는 시간·일정·이유는 말하지 말 것. 이전 대화·추측도 사실 아님.
+→ **평소엔**: 이번 user 말과 연결될 때만. 해낸 기록은 **먼저 알아봐주고 같이 반가워해도 좋다**. 멈춘 목표·밀린 할 일은 **대화당 최대 한 번**. 다그침·숙제 검사 금지.
+→ **몸 상태·급한 일이 먼저**: user가 아프거나 급한 일이 생겼다고 하면 계획표는 접어두고 그것부터 받는다.`
       : ''
 
   const personaGap = lite ? undefined : personaGaps(p, 1)[0]
@@ -1286,13 +1282,7 @@ export function buildSystemPrompt(
     ? `\n## 아직 못 들은 것 (선택)\n- "${personaGap.question}"\n→ 대화가 가볍고 한가할 때만, 이번 대화 통틀어 최대 한 번 지나가듯 물어봐도 된다. user가 힘든 얘기 중이면 금지. 답은 기억해두면 된다.`
     : ''
 
-  const answerStructure = scheduleAsk
-    ? `## 답변 구조 (일정 질문)
-- **"일정 질문 — 사실만" 블록**만 읽고 답할 것. 항목명·완료 여부 그대로.
-- 오늘/내일 질문이면 **일간** 목록만. 이번 주·달 목표 섞지 말 것.
-- 시간·장소·미룬 이유는 **항목에 적혀 있을 때만**. 없으면 언급 금지.
-- 틀렸다면 변명·재추측 없이 짧게 인정 + 목록만 다시.`
-    : concretizing
+  const answerStructure = concretizing
     ? `## 답변 구조 (지금은 구체화 단계)
 - user 말·상황이 **아직 흐림**. 이번 턴 **판단·결론·행동 과제 금지**.
 - 아래 **1개만**: (1) 짧게 받아주기 0~1문장 + (2) 방금 말에서 갈라지는 **가지·장면·trigger 하나** 좁히기
@@ -1368,7 +1358,7 @@ ${analysis.vague || analysis.inConcretizationFlow ? '- **구체화 단계** — 
 ${analysis.requiresExternalData ? '- 외부 정보가 필요한 질문일 수 있음. 최신 숫자·시세는 지어내지 말 것.' : ''}
 
 ## 이번 턴 가이드
-- ${scheduleGuide || situation}${scheduleGuide ? `\n- ${situation}` : ''}${growthTouchLine}
+- ${situation}${growthTouchLine}
 ${antiRepeat}
 
 ${answerStructure}
@@ -1378,6 +1368,7 @@ ${CONCRETIZATION_INTERVIEW_BAN}
 ${FILLER_OVERUSE_BAN}
 ${NO_ECHO_BAN}
 ${PROFILE_SURFACE_BAN}
+${knownFacts ? FACT_GROUNDING_BAN : ''}
 ${lite ? '' : TODO_DIRECTIVE_GUIDE}
 
 ## 예시 (구조만 — 말투·어휘 복사 X)
@@ -2328,6 +2319,9 @@ export async function fetchAIResponse(
       mode,
     ) + (focusInstruction ? `\n\n## 이번 답변의 추가 지시\n${focusInstruction}` : '')
 
+  const hasKnownFacts = collectKnownFactCorpus().trim().length > 0
+  const chatTemperature = hasKnownFacts ? 0.55 : 0.82
+
   const recentLimit = lite ? RECENT_MESSAGES_LITE : RECENT_MESSAGES_FOR_API
   let recent = apiMessages
   if (replyPlan && apiMessages.length > recentLimit) {
@@ -2351,15 +2345,21 @@ export async function fetchAIResponse(
   const contents = [...primer, ...realTurns]
 
   try {
+    let strictRetry = false
     for (let attempt = 0; attempt < 2; attempt++) {
+      const prompt =
+        systemPrompt +
+        (strictRetry
+          ? '\n\n## 수정\n방금 초안에 **데이터에 없는 시간·일정**이 들어갔다. "알고 있는 것"에 적힌 **단어만** 써서 다시 답하라. 시간은 라벨에 없으면 말하지 말 것.'
+          : '')
       const data = await geminiGenerate(
         apiKey,
         resolvedModel,
         {
-          systemInstruction: { parts: [{ text: systemPrompt }] },
+          systemInstruction: { parts: [{ text: prompt }] },
           contents,
           generationConfig: {
-            temperature: 0.82,
+            temperature: strictRetry ? 0.25 : chatTemperature,
             maxOutputTokens: 220,
             thinkingConfig: { thinkingBudget: 0 },
           },
@@ -2373,7 +2373,17 @@ export async function fetchAIResponse(
       const text = body
         ? stripFactualSearchBleed(enforceReplyLimits(body, lastUser?.content))
         : ''
-      if (text) return { text, todo }
+      if (text) {
+        if (hasKnownFacts && !strictRetry) {
+          const audit = auditReplyAgainstKnownFacts(text)
+          if (!audit.ok) {
+            console.info('[FutureMe/Gemini] fact audit failed, retrying', audit.reason)
+            strictRetry = true
+            continue
+          }
+        }
+        return { text, todo }
+      }
       if (attempt === 0) {
         console.info('[FutureMe/Gemini] retry chatReply (empty response)')
         await sleep(1000)

@@ -44,11 +44,19 @@ describe('parseScheduleRequest', () => {
 })
 
 describe('stripDateLabelPrefix', () => {
-  it('답변 앞의 날짜 라벨을 지운다', () => {
+  it('날짜 라벨을 지운다', () => {
     expect(stripDateLabelPrefix('[7/21 (화)] 오늘 축구 있잖아')).toBe('오늘 축구 있잖아')
     expect(stripDateLabelPrefix('7/21(화) 축구 있어')).toBe('축구 있어')
   })
-  it('라벨이 없으면 그대로', () => {
+  it('시각 라벨도 지운다 (16:48] …)', () => {
+    expect(stripDateLabelPrefix('16:48] 내일 오후 2시 안암 출근 적어둘게')).toBe('내일 오후 2시 안암 출근 적어둘게')
+    expect(stripDateLabelPrefix('16:58] 확인했어. 내일 2시 전까지 여유 있겠네')).toBe('확인했어. 내일 2시 전까지 여유 있겠네')
+  })
+  it('혼합형 [7/21(화) 16:48] 도 지운다', () => {
+    expect(stripDateLabelPrefix('[7/21(화) 16:48] 축구 있어')).toBe('축구 있어')
+  })
+  it('라벨이 없으면 그대로 — 답변 속 시각은 안 건드림', () => {
     expect(stripDateLabelPrefix('오늘 축구 있어')).toBe('오늘 축구 있어')
+    expect(stripDateLabelPrefix('내일 오후 2시에 축구야')).toBe('내일 오후 2시에 축구야')
   })
 })

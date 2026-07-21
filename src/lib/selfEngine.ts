@@ -1840,9 +1840,24 @@ export function isSyntheticErrorReply(content: string): boolean {
 // (모델이 임의로 사용자 계획표에 쓰는 일은 없다 — 제안하고, 사람이 확정한다)
 // ---------------------------------------------------------------------------
 
-/** 모델이 프롬프트 내부 날짜 라벨을 답변 앞에 베끼는 것 제거 — 예: "[7/21 (화)] …" */
+/**
+ * 모델이 프롬프트 내부 라벨(각 턴 앞 [M/D (요) HH:MM])을 답변 앞에 베끼는 것 제거.
+ * "[7/21 (화)] …", "16:48] …", "[7/21(화) 16:48] …", "7/21(화) …" 모두.
+ */
 export function stripDateLabelPrefix(text: string): string {
-  return text.replace(/^\s*[[［]?\s*\d{1,2}\s*\/\s*\d{1,2}\s*\(?\s*[월화수목금토일]\s*\)?\s*[\]］]?\s*/, '').trim()
+  // 형태 A: 닫는 대괄호로 끝나는 라벨 (여는 대괄호는 있을 수도 없을 수도)
+  //   [7/21 (화)] / 16:48] / [7/21(화) 16:48]
+  const bracketed =
+    /^\s*[[［]?\s*(?:\d{1,2}\s*\/\s*\d{1,2}\s*)?(?:\(?\s*[월화수목금토일]\s*\)?\s*)?(?:\d{1,2}\s*:\s*\d{2}\s*)?[\]］]\s*/
+  // 형태 B: 괄호 없이 "7/21(화) " 로 시작
+  const bare = /^\s*\d{1,2}\s*\/\s*\d{1,2}\s*\(?\s*[월화수목금토일]\s*\)?\s*/
+  let out = text
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(bracketed, '').replace(bare, '')
+    if (next === out) break
+    out = next
+  }
+  return out.trim()
 }
 
 export type ChatTodoDirective = { date: string; title: string }

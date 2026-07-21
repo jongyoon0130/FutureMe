@@ -30,7 +30,6 @@ import {
   GeminiApiError,
   resetProfilePromptBulk,
   shouldUseLitePrompt,
-  suggestSmallAction,
 } from '../../lib/selfEngine'
 import type { ApiCheckResult, ChatTodoDirective } from '../../lib/selfEngine'
 import {
@@ -51,7 +50,6 @@ import {
   clearApiCheckCache,
   loadApiCheckCache,
 } from '../../lib/storage'
-import { addSavedDilemma, addSmallAction } from '../../lib/growthStore'
 import { addMiscTodo, loadMiscTodos } from '../../lib/goalMiscTodos'
 import { getGoalAppOwnerId } from '../../lib/goalAppOwner'
 import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
@@ -85,14 +83,6 @@ function formatTodoDate(date: string, now = new Date()): string {
   return label
 }
 
-function fallbackSmallActionEncouragement(action: string): string {
-  const lines = [
-    `오케이, ${action}. 오늘 한 번만 해보자.`,
-    `좋아. ${action} 정했으면 반은 한 거야. 하고 나면 나한테 얘기해줘.`,
-    `${action} 가자. 지금 아니면 또 미룰걸?`,
-  ]
-  return lines[Math.floor(Math.random() * lines.length)]
-}
 
 interface Props {
   profileId: string
@@ -634,9 +624,7 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     persistSelf(resetProfilePromptBulk(self))
   }
 
-  // ── 자기이해 → 용기 → 실행 액션 ─────────────────────────────
   const [toast, setToast] = useState<string | null>(null)
-  const [actionSuggesting, setActionSuggesting] = useState(false)
   const flashToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 1600)
@@ -657,106 +645,6 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     window.dispatchEvent(new Event(GOAL_DATA_SYNC_EVENT))
     setPendingTodo(null)
     flashToast('계획표에 추가됨 📅')
-  }
-
-  const lastUserMessage = () => [...messages].reverse().find((m) => m.role === 'user') ?? null
-
-  const saveLastUserAsDilemma = () => {
-    const last = lastUserMessage()
-    if (!last) return flashToast('저장할 고민이 아직 없어')
-    persistSelf(addSavedDilemma(self, last.content))
-    flashToast('고민 저장됨 🔖')
-  }
-
-  // C: AI가 최근 대화에서 작은 행동 하나 제안 → 프리필 → A: 현재의 나가 바로 밀어줌
-  const addSmallActionQuick = async () => {
-    if (typing || !chatReady || actionSuggesting) return
-    let suggestion = ''
-    const key = loadApiKey()
-    if (key && messages.length > 0) {
-      setActionSuggesting(true)
-      try {
-        const history = messages.map((m) => ({
-          role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-          content: m.content,
-          timestamp: m.timestamp,
-        }))
-        suggestion = await suggestSmallAction(history, key, getActiveModel(loadModel()))
-      } catch {
-        /* 제안 실패는 조용히 무시 → 빈 입력창 */
-      } finally {
-        setActionSuggesting(false)
-      }
-    }
-    const text = window.prompt(
-      suggestion
-        ? '이 행동 어때? 마음에 안 들면 고쳐도 돼 ✍️'
-        : '작게 해볼 한 걸음을 적어줘\n예: 오늘 밤 이력서 첫 줄만 고치기',
-      suggestion,
-    )
-    if (!text?.trim()) return
-    const action = text.trim()
-    persistSelf(addSmallAction(self, action))
-    // 대화에서 정한 행동은 홈 계획표의 '오늘 할 일'에도 올려 실행으로 이어지게 한다
-    try {
-      const owner = getGoalAppOwnerId()
-      addMiscTodo(owner, loadMiscTodos(owner), 'daily', new Date(), action)
-    } catch {
-      /* 홈 계획표 저장 실패는 조용히 무시 — 채팅 흐름을 막지 않는다 */
-    }
-
-    const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: action,
-      timestamp: Date.now(),
-    }
-    const workingMessages = [...messages, userMsg]
-    setMessages(workingMessages)
-    learnFromMessage(action)
-
-    const mdl = getActiveModel(loadModel())
-    let reply = fallbackSmallActionEncouragement(action)
-    if (key) {
-      hideRetryBanner()
-      setTyping(true)
-      try {
-        const history = workingMessages.map((m) => ({
-          role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
-          content: m.content,
-          timestamp: m.timestamp,
-        }))
-        reply = (
-          await fetchAIResponse(
-            self,
-            history,
-            key,
-            mdl,
-            {
-              contextMessages: history.slice(0, -1),
-              focusContent: action,
-              focusTimestamp: userMsg.timestamp,
-              focusInstruction:
-                'user가 방금 \'작은 행동\'으로 위 한 줄을 정했다. 이미 정한 행동이니 다시 제안하지 말고, 내 말투로 짧게 밀어줘. 행동명을 작은따옴표+대시로 되따라치지 말 것. 행동과 안 맞는 "5분" 같은 시간은 붙이지 말 것.',
-            },
-            'courage',
-          )
-        ).text
-      } catch {
-        /* fallback 유지 */
-      } finally {
-        setTyping(false)
-      }
-    }
-
-    const pushMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'self',
-      content: reply,
-      timestamp: Date.now(),
-    }
-    setMessages((m) => insertReplyAfterUser(m, userMsg.id, pushMsg))
-    flashToast('작은 행동 추가됨 ✅')
   }
 
   const apiHeavyProfile = shouldUseLitePrompt(self, messages.length)
@@ -1239,24 +1127,9 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
             </div>
           </div>
         ) : null}
-      {messages.length > 0 && (
-        <div className="px-3 pt-2 -mb-0.5 flex items-center gap-1.5 flex-wrap">
-          <button
-            type="button"
-            onClick={saveLastUserAsDilemma}
-            className="text-[12px] px-2.5 py-1.5 rounded-full bg-surface-2 border border-border/50 text-ink/80 hover:text-ink hover:border-accent/40 transition-colors"
-          >
-            🔖 고민 저장
-          </button>
-          <button
-            type="button"
-            onClick={() => void addSmallActionQuick()}
-            disabled={actionSuggesting || typing}
-            className="text-[12px] px-2.5 py-1.5 rounded-full bg-surface-2 border border-border/50 text-ink/80 hover:text-ink hover:border-accent/40 transition-colors disabled:opacity-40"
-          >
-            {actionSuggesting ? '행동 떠올리는 중…' : '✅ 작은 행동'}
-          </button>
-          {toast && <span className="text-[11px] text-status-ok ml-0.5">{toast}</span>}
+      {toast && (
+        <div className="px-3 pt-2 -mb-0.5">
+          <span className="text-[11px] text-status-ok">{toast}</span>
         </div>
       )}
       <div className="px-3 py-2.5">

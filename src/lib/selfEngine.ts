@@ -1840,6 +1840,11 @@ export function isSyntheticErrorReply(content: string): boolean {
 // (모델이 임의로 사용자 계획표에 쓰는 일은 없다 — 제안하고, 사람이 확정한다)
 // ---------------------------------------------------------------------------
 
+/** 모델이 프롬프트 내부 날짜 라벨을 답변 앞에 베끼는 것 제거 — 예: "[7/21 (화)] …" */
+export function stripDateLabelPrefix(text: string): string {
+  return text.replace(/^\s*[[［]?\s*\d{1,2}\s*\/\s*\d{1,2}\s*\(?\s*[월화수목금토일]\s*\)?\s*[\]］]?\s*/, '').trim()
+}
+
 export type ChatTodoDirective = { date: string; title: string }
 
 /** 채팅 응답 — 보여줄 본문 + (있으면) 일정 추가 제안 */
@@ -2373,7 +2378,7 @@ export async function fetchAIResponse(
       // 지시문은 문장 다듬기(3문장 제한 등) 전에 떼어낸다 — 안 그러면 잘려 나간다
       const { text: body, todo } = extractTodoDirective(raw ?? '')
       const text = body
-        ? stripFactualSearchBleed(enforceReplyLimits(body, lastUser?.content))
+        ? stripDateLabelPrefix(stripFactualSearchBleed(enforceReplyLimits(body, lastUser?.content)))
         : ''
       if (text) {
         if (hasKnownFacts) {

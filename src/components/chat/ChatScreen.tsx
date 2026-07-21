@@ -55,6 +55,7 @@ import { addSavedDilemma, addSmallAction } from '../../lib/growthStore'
 import { addMiscTodo, loadMiscTodos } from '../../lib/goalMiscTodos'
 import { getGoalAppOwnerId } from '../../lib/goalAppOwner'
 import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
+import { parseScheduleRequest } from '../../lib/chatScheduleParse'
 
 function readInitialApiStatus(): 'idle' | ApiCheckResult {
   const key = loadApiKey()?.trim() ?? ''
@@ -485,8 +486,10 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
         focusInstruction: plan.focusInstruction,
       })
       reply = res.text
-      // 일정 추가 제안이 왔으면 확인 카드로 — 저장은 user가 누를 때만
-      if (res.todo) setPendingTodo(res.todo)
+      // 일정 추가 확인 카드 — 모델 지시문이 있으면 그걸, 없으면 앱이 직접 파싱한 걸로.
+      // (모델이 지시문을 안 뱉어도 카드가 뜨게 — user가 누를 때만 저장)
+      const todo = res.todo ?? parseScheduleRequest(plan.focusContent, new Date())
+      if (todo) setPendingTodo(todo)
       chatOk = true
       setLastUsageTick(Date.now())
     } catch (e) {
@@ -1205,16 +1208,23 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
         ) : null}
         {pendingTodo ? (
           <div className="px-3 pt-2.5 pb-1.5 border-b border-border/40 bg-accent/5">
-            <p className="text-[11px] text-muted mb-1.5">계획표에 이거 넣을까?</p>
+            <p className="text-[11px] text-muted mb-1.5">계획표에 이거 넣을까? (고쳐도 돼)</p>
             <div className="flex items-center gap-1.5">
-              <div className="flex-1 min-w-0 px-2.5 py-2 rounded-xl bg-surface border border-accent/30">
-                <p className="text-[12px] text-ink truncate">{pendingTodo.title}</p>
+              <div className="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl bg-surface border border-accent/30">
+                <input
+                  type="text"
+                  value={pendingTodo.title}
+                  onChange={(e) => setPendingTodo({ ...pendingTodo, title: e.target.value })}
+                  className="w-full bg-transparent text-[12px] text-ink focus:outline-none"
+                  aria-label="일정 제목"
+                />
                 <p className="text-[11px] text-muted mt-0.5">{formatTodoDate(pendingTodo.date)}</p>
               </div>
               <button
                 type="button"
                 onClick={confirmPendingTodo}
-                className="shrink-0 px-3 py-2 rounded-xl bg-accent text-surface text-[12px] font-medium"
+                disabled={!pendingTodo.title.trim()}
+                className="shrink-0 px-3 py-2 rounded-xl bg-accent text-surface text-[12px] font-medium disabled:opacity-40"
               >
                 추가
               </button>

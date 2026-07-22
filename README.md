@@ -194,6 +194,20 @@ bun run lint           # Oxlint
 - AI 답변을 받으려면 앱 안 ⚙️ 설정에서 **본인 Gemini API 키**를 입력해야 한다 (키는 기기에만 저장)
 - 로컬(localhost)과 배포 URL의 로컬 데이터는 분리된다 — 옮기려면 Google 로그인 동기화 또는 백업 JSON
 
+### ⚠️ 커밋 전에 git 이메일부터 (Vercel 배포가 막힌다)
+
+새 컴퓨터에서 `user.email`을 안 정해두면 git이 `이름@맥북이름.local` 같은 가짜 주소를
+자동으로 만들어 쓴다. 그 커밋이 main에 올라가면 **Vercel이 배포를 거부한다**
+("commit author email is not valid"). 클론하자마자 한 번 설정해두면 된다.
+
+```bash
+git config --global user.name "이름"
+git config --global user.email "깃허브에-등록된-이메일"
+```
+
+이메일은 **GitHub 계정에 등록·인증된 주소**여야 한다 (GitHub → Settings → Emails).
+공개하기 싫으면 같은 화면의 `...@users.noreply.github.com` 주소를 쓰면 된다.
+
 ---
 
 ## 9. 주요 파일 지도

@@ -54,6 +54,7 @@ import { addMiscTodo, loadMiscTodos } from '../../lib/goalMiscTodos'
 import { getGoalAppOwnerId } from '../../lib/goalAppOwner'
 import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
 import { dateKeyOf, shiftDateKey, todoDraftFromMessage, type PendingTodo } from '../../lib/chatToPlan'
+import { NotifySettings } from '../settings/NotifySettings'
 
 function readInitialApiStatus(): 'idle' | ApiCheckResult {
   const key = loadApiKey()?.trim() ?? ''
@@ -948,6 +949,7 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
               )
             })()}
           </div>
+          <NotifySettings />
           <div>
             <p className="text-xs text-muted mb-2">지금까지 학습한 내 말투</p>
             <div className="flex flex-wrap gap-1.5">

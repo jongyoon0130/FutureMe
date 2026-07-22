@@ -8,9 +8,11 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#141414" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Future Me" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- viewport-fit=cover / status-bar-style=black-translucent 를 쓰면 iOS가 화면을
+         상태바 밑까지 넓혀버린다. 이 앱은 safe-area 여백을 전제로 만들어져 있지 않아서
+         맨 위 헤더(설정·목록 버튼)가 시계에 가려 눌리지 않았다. 그래서 둘 다 쓰지 않는다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />

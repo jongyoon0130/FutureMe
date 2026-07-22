@@ -325,6 +325,8 @@ export interface AggregatedItem extends PlanCheckItem {
   planId: string
   planTitle: string
   tier: 'daily' | 'weekly' | 'monthly'
+  /** 반복 일정에서 생긴 할 일이면 그 루틴 id (goalRoutines.ts) */
+  routineId?: string
 }
 
 export function aggregateHome(plans: GoalPlan[]): {

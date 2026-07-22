@@ -1,48 +1,25 @@
-// 자기이해 → 용기 → 실행: 저장한 고민 / 작은 행동 / 미래의 나 메모 + 기억 관리.
+// 지난 기록(고민 / 작은 행동 / 미래의 나 메모) 정리 + 기억 관리.
+//
+// 저장 버튼은 채팅에서 걷어냈다 — 작은 행동은 이제 계획표로 이어지고, 고민 저장은
+// 아무도 다시 열어보지 않는 서랍이었다. 그래서 **새로 쌓는 함수는 없다.**
+// 다만 이미 남긴 기록은 지우지 않는다(신뢰 원칙) — 프로필의 "지난 기록"에서
+// 보고 지울 수 있게, 읽기·완료·삭제만 남겼다.
+//
 // 전부 순수 함수 — 프로필을 받아 "새 프로필"을 반환한다. 저장/동기화는 호출부(persistSelf)가 담당.
-import type { SelfProfile, SavedDilemma, SmallAction, FutureSelfNote } from '../types/self'
+import type { SelfProfile, SmallAction } from '../types/self'
 
 const now = () => Date.now()
 
 // ---------------------------------------------------------------------------
-// 저장한 고민
+// 저장한 고민 (지난 기록)
 // ---------------------------------------------------------------------------
-export function addSavedDilemma(p: SelfProfile, text: string): SelfProfile {
-  const t = text.trim()
-  if (!t) return p
-  const item: SavedDilemma = { id: crypto.randomUUID(), text: t, createdAt: now(), status: 'open' }
-  return { ...p, savedDilemmas: [item, ...(p.savedDilemmas ?? [])] }
-}
-
-export function resolveSavedDilemma(p: SelfProfile, id: string, note: string): SelfProfile {
-  const next = (p.savedDilemmas ?? []).map((d): SavedDilemma =>
-    d.id === id
-      ? { ...d, status: 'resolved', resolvedNote: note.trim() || undefined, resolvedAt: now() }
-      : d,
-  )
-  return { ...p, savedDilemmas: next }
-}
-
 export function removeSavedDilemma(p: SelfProfile, id: string): SelfProfile {
   return { ...p, savedDilemmas: (p.savedDilemmas ?? []).filter((d) => d.id !== id) }
 }
 
 // ---------------------------------------------------------------------------
-// 작은 행동
+// 작은 행동 (지난 기록)
 // ---------------------------------------------------------------------------
-export function addSmallAction(p: SelfProfile, text: string, fromDilemmaId?: string): SelfProfile {
-  const t = text.trim()
-  if (!t) return p
-  const item: SmallAction = {
-    id: crypto.randomUUID(),
-    text: t,
-    createdAt: now(),
-    done: false,
-    fromDilemmaId,
-  }
-  return { ...p, smallActions: [item, ...(p.smallActions ?? [])] }
-}
-
 export function toggleSmallAction(p: SelfProfile, id: string): SelfProfile {
   const next = (p.smallActions ?? []).map((a): SmallAction =>
     a.id === id ? { ...a, done: !a.done, doneAt: !a.done ? now() : undefined } : a,
@@ -55,15 +32,8 @@ export function removeSmallAction(p: SelfProfile, id: string): SelfProfile {
 }
 
 // ---------------------------------------------------------------------------
-// 미래의 나 메모
+// 미래의 나 메모 (지난 기록)
 // ---------------------------------------------------------------------------
-export function addFutureSelfNote(p: SelfProfile, text: string, sourceMessageId?: string): SelfProfile {
-  const t = text.trim()
-  if (!t) return p
-  const item: FutureSelfNote = { id: crypto.randomUUID(), text: t, createdAt: now(), sourceMessageId }
-  return { ...p, futureSelfNotes: [item, ...(p.futureSelfNotes ?? [])] }
-}
-
 export function removeFutureSelfNote(p: SelfProfile, id: string): SelfProfile {
   return { ...p, futureSelfNotes: (p.futureSelfNotes ?? []).filter((n) => n.id !== id) }
 }

@@ -9,6 +9,7 @@ import {
 import { loadGoalPlans } from './goalPlanStore'
 import { writeGoalPlanSnapshot } from './goalPlanSnapshot'
 import { loadMiscTodos, type MiscTodoItem } from './goalMiscTodos'
+import { loadRoutines, type MiscRoutine } from './goalRoutines'
 import { isApplyingRemoteGoalData, setApplyingRemoteGoalData } from './goalDataSyncState'
 
 const REVISION_KEY = 'futureme-goal-data-revision'
@@ -18,6 +19,7 @@ export type GoalDataBundle = {
   ownerId: string
   plans: GoalPlan[]
   miscTodos: MiscTodoItem[]
+  routines: MiscRoutine[]
   updatedAt: number
 }
 
@@ -46,13 +48,14 @@ export function loadLocalGoalDataBundle(): GoalDataBundle {
     ownerId,
     plans: loadGoalPlans(ownerId),
     miscTodos: loadMiscTodos(ownerId),
+    routines: loadRoutines(ownerId),
     updatedAt: getGoalDataRevision(),
   }
 }
 
 export function hasLocalGoalData(): boolean {
   const bundle = loadLocalGoalDataBundle()
-  return bundle.plans.length > 0 || bundle.miscTodos.length > 0
+  return bundle.plans.length > 0 || bundle.miscTodos.length > 0 || bundle.routines.length > 0
 }
 
 function plansKey(ownerId: string): string {
@@ -63,12 +66,17 @@ function miscKey(ownerId: string): string {
   return `goal-misc-todos-${ownerId}`
 }
 
+function routinesKey(ownerId: string): string {
+  return `goal-misc-routines-${ownerId}`
+}
+
 export function applyLocalGoalDataBundle(bundle: GoalDataBundle): void {
   setApplyingRemoteGoalData(true)
   try {
     localStorage.setItem('goal-app-owner-id', bundle.ownerId)
     localStorage.setItem(plansKey(bundle.ownerId), JSON.stringify(bundle.plans))
     localStorage.setItem(miscKey(bundle.ownerId), JSON.stringify(bundle.miscTodos))
+    localStorage.setItem(routinesKey(bundle.ownerId), JSON.stringify(bundle.routines))
     writeGoalPlanSnapshot(bundle.ownerId, bundle.plans)
     markGoalDataRevision(bundle.updatedAt)
   } finally {
@@ -105,6 +113,23 @@ function mergeMiscTodos(
   return [...byId.values()]
 }
 
+/** 루틴도 id 기준 병합 — 최근에 바뀐 쪽을 우선한다 (할 일과 같은 규칙) */
+function mergeRoutines(
+  local: MiscRoutine[],
+  remote: MiscRoutine[],
+  localRev: number,
+  remoteRev: number,
+): MiscRoutine[] {
+  const preferLocal = localRev >= remoteRev
+  const byId = new Map<string, MiscRoutine>()
+  for (const r of remote) byId.set(r.id, r)
+  for (const r of local) {
+    const existing = byId.get(r.id)
+    if (!existing || preferLocal) byId.set(r.id, r)
+  }
+  return [...byId.values()]
+}
+
 export function mergeGoalDataBundles(local: GoalDataBundle, remote: GoalDataBundle): GoalDataBundle {
   const ownerId = remote.updatedAt >= local.updatedAt ? remote.ownerId : local.ownerId
   const updatedAt = Math.max(local.updatedAt, remote.updatedAt, Date.now())
@@ -112,6 +137,7 @@ export function mergeGoalDataBundles(local: GoalDataBundle, remote: GoalDataBund
     ownerId,
     plans: mergePlans(local.plans, remote.plans),
     miscTodos: mergeMiscTodos(local.miscTodos, remote.miscTodos, local.updatedAt, remote.updatedAt),
+    routines: mergeRoutines(local.routines, remote.routines, local.updatedAt, remote.updatedAt),
     updatedAt,
   }
 }
@@ -121,6 +147,7 @@ export function remoteRowToBundle(row: RemoteGoalDataRow): GoalDataBundle {
     ownerId: row.owner_id,
     plans: Array.isArray(row.plans) ? (row.plans as GoalPlan[]) : [],
     miscTodos: Array.isArray(row.misc_todos) ? (row.misc_todos as MiscTodoItem[]) : [],
+    routines: Array.isArray(row.routines) ? (row.routines as MiscRoutine[]) : [],
     updatedAt: row.updated_at,
   }
 }
@@ -133,6 +160,7 @@ export async function pushLocalGoalData(): Promise<void> {
     ownerId: bundle.ownerId,
     plans: bundle.plans,
     miscTodos: bundle.miscTodos,
+    routines: bundle.routines,
     updatedAt,
   })
 }
@@ -172,6 +200,7 @@ export async function syncGoalDataOnLogin(userId: string): Promise<'uploaded' | 
         ownerId: merged.ownerId,
         plans: merged.plans,
         miscTodos: merged.miscTodos,
+        routines: merged.routines,
         updatedAt: merged.updatedAt,
       })
       return 'merged'
@@ -186,6 +215,7 @@ export async function syncGoalDataOnLogin(userId: string): Promise<'uploaded' | 
       ownerId: merged.ownerId,
       plans: merged.plans,
       miscTodos: merged.miscTodos,
+      routines: merged.routines,
       updatedAt: merged.updatedAt,
     })
     return 'merged'

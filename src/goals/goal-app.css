@@ -868,6 +868,10 @@ html, body, #root {
   border-color: var(--goal-accent);
 }
 
+.goal-app .goal-tier-add-wrap {
+  margin-bottom: 10px;
+}
+
 .goal-app .goal-tier-add {
   display: flex;
   gap: 8px;
@@ -878,6 +882,69 @@ html, body, #root {
   border: 1px solid var(--goal-line);
   border-radius: var(--goal-radius-md);
   box-shadow: var(--goal-shadow);
+}
+
+.goal-app .goal-tier-add-wrap .goal-tier-add {
+  margin-bottom: 0;
+}
+
+/* 반복(루틴) 고르기 — 한 번 등록하면 그 요일마다 할 일이 생긴다 */
+.goal-app .goal-tier-repeat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: var(--goal-surface);
+  border: 1px solid var(--goal-line);
+  border-radius: var(--goal-radius-md);
+  box-shadow: var(--goal-shadow);
+}
+
+.goal-app .goal-tier-repeat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--goal-muted);
+  margin-right: 2px;
+}
+
+.goal-app .goal-tier-repeat-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border: 1px solid var(--goal-line);
+  border-radius: 999px;
+  background: var(--goal-bg);
+  color: var(--goal-ink);
+}
+
+.goal-app .goal-tier-repeat-chip.on {
+  background: var(--goal-accent-soft);
+  border-color: var(--goal-accent);
+}
+
+.goal-app .goal-tier-repeat-days {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.goal-app .goal-tier-repeat-day {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--goal-line);
+  border-radius: 999px;
+  background: var(--goal-bg);
+  color: var(--goal-muted);
+}
+
+.goal-app .goal-tier-repeat-day.on {
+  background: var(--goal-accent);
+  border-color: var(--goal-accent);
+  color: #fff;
 }
 
 .goal-app .goal-tier-add-plan {
@@ -1171,6 +1238,71 @@ html, body, #root {
   font-weight: 500;
   color: var(--goal-muted);
   margin-bottom: 2px;
+}
+
+/* 반복 일정 지우기 — 이 날만 vs 반복 전체 */
+.goal-app .goal-routine-choice-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--goal-ink);
+  line-height: 1.45;
+}
+
+.goal-app .goal-routine-choice-sub {
+  font-size: 12px;
+  color: var(--goal-muted);
+  margin-top: 4px;
+}
+
+.goal-app .goal-routine-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.goal-app .goal-routine-choice-btn {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--goal-line);
+  border-radius: 12px;
+  background: var(--goal-bg);
+  color: var(--goal-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.goal-app .goal-routine-choice-btn.danger {
+  color: #c2453c;
+}
+
+.goal-app .goal-routine-choice-btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--goal-muted);
+}
+
+.goal-app .goal-routine-choice-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--goal-muted);
+  text-align: center;
+}
+
+.goal-app .goal-chk-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.goal-app .goal-chk-repeat {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--goal-muted);
+  margin-bottom: 2px;
+  white-space: nowrap;
 }
 
 .goal-app .goal-chk-goal-picker {

@@ -16,6 +16,8 @@ export interface MiscTodoItem {
   /** 일간 — 24h HH:mm */
   timeStart?: string
   timeEnd?: string
+  /** 반복 일정에서 생긴 행이면 그 루틴 id (goalRoutines.ts) */
+  routineId?: string
 }
 
 function storageKey(profileId: string): string {
@@ -76,6 +78,7 @@ export function insertMiscTodo(
   done = false,
   timeStart?: string,
   timeEnd?: string,
+  extra?: { routineId?: string },
 ): MiscTodoItem[] {
   const trimmed = label.trim()
   if (!trimmed) return items
@@ -88,6 +91,7 @@ export function insertMiscTodo(
   }
   if (timeStart?.trim()) row.timeStart = timeStart.trim()
   if (timeEnd?.trim()) row.timeEnd = timeEnd.trim()
+  if (extra?.routineId) row.routineId = extra.routineId
   const next = [...items, row]
   saveMiscTodos(profileId, next)
   return next
@@ -101,6 +105,18 @@ export function toggleMiscTodo(profileId: string, items: MiscTodoItem[], itemId:
 
 export function removeMiscTodo(profileId: string, items: MiscTodoItem[], itemId: string): MiscTodoItem[] {
   const next = items.filter((it) => it.id !== itemId)
+  saveMiscTodos(profileId, next)
+  return next
+}
+
+export function removeMiscTodos(
+  profileId: string,
+  items: MiscTodoItem[],
+  itemIds: readonly string[],
+): MiscTodoItem[] {
+  const drop = new Set(itemIds)
+  if (!drop.size) return items
+  const next = items.filter((it) => !drop.has(it.id))
   saveMiscTodos(profileId, next)
   return next
 }
@@ -148,6 +164,7 @@ function toAggregated(items: MiscTodoItem[]): AggregatedItem[] {
     tier: it.tier,
     timeStart: it.timeStart,
     timeEnd: it.timeEnd,
+    ...(it.routineId ? { routineId: it.routineId } : {}),
   }))
 }
 

@@ -4,12 +4,22 @@ import {
   loadMiscTodos,
   miscAggregatedForDate,
   removeMiscTodo,
+  removeMiscTodos,
   toggleMiscTodo,
   updateMiscTodoLabel,
   updateMiscTodoTime,
   type MiscTodoItem,
 } from '../../lib/goalMiscTodos'
 import { compareTaskTime, formatTaskTimeRange } from '../../lib/goalTaskTime'
+import {
+  describeRoutineDays,
+  endRoutine,
+  futureRoutineItemIds,
+  loadRoutines,
+  materializeRoutines,
+  skipRoutineOn,
+  type MiscRoutine,
+} from '../../lib/goalRoutines'
 import type { SelfProfile } from '../../types/self'
 import type { GoalPlan } from '../../types/goalPlan'
 import { GoalDayClose } from './GoalDayClose'
@@ -125,12 +135,27 @@ export function GoalDrilldownHome({
   const [addingTier, setAddingTier] = useState<'daily' | 'weekly' | 'monthly' | null>(null)
   const [miscTodos, setMiscTodos] = useState<MiscTodoItem[]>(() => loadMiscTodos(profile.id))
   const [timeEdit, setTimeEdit] = useState<TimeEditTarget | null>(null)
+  const [routines, setRoutines] = useState<MiscRoutine[]>(() => loadRoutines(profile.id))
+  /** 반복 일정 지우기 — "이 날만"인지 "반복 전체"인지 물어본다 */
+  const [routineDelete, setRoutineDelete] = useState<{
+    item: MiscTodoItem
+    routine: MiscRoutine
+  } | null>(null)
 
   useEffect(() => {
-    const onSynced = () => setMiscTodos(loadMiscTodos(profile.id))
+    const onSynced = () => {
+      setMiscTodos(loadMiscTodos(profile.id))
+      setRoutines(loadRoutines(profile.id))
+    }
     window.addEventListener(GOAL_DATA_SYNC_EVENT, onSynced)
     return () => window.removeEventListener(GOAL_DATA_SYNC_EVENT, onSynced)
   }, [profile.id])
+
+  // 앞으로 2주치 반복 일정을 채워둔다 (앱을 열 때마다 한 번씩 앞으로 밀린다)
+  useEffect(() => {
+    if (!routines.length) return
+    setMiscTodos((items) => materializeRoutines(profile.id, items, routines))
+  }, [profile.id, routines])
 
   const now = new Date()
   const selectedDate = useMemo(() => {
@@ -357,6 +382,31 @@ export function GoalDrilldownHome({
     return achieved || (dday != null && dday <= 0)
   })
 
+  const repeatLabelOf = (routineId?: string): string | undefined => {
+    if (!routineId) return undefined
+    const r = routines.find((x) => x.id === routineId)
+    return r ? describeRoutineDays(r.days) : undefined
+  }
+
+  /** 이 날 하루만 빼기 — 반복은 계속된다 */
+  const skipThisDay = () => {
+    if (!routineDelete) return
+    const { item, routine } = routineDelete
+    setRoutines(skipRoutineOn(profile.id, routines, routine.id, item.periodKey))
+    setMiscTodos(removeMiscTodo(profile.id, miscTodos, item.id))
+    setRoutineDelete(null)
+  }
+
+  /** 반복 끝내기 — 지난 기록은 남기고, 오늘부터의 예정만 지운다 */
+  const stopRoutine = () => {
+    if (!routineDelete) return
+    const { routine } = routineDelete
+    const from = new Date()
+    setRoutines(endRoutine(profile.id, routines, routine.id, from))
+    setMiscTodos(removeMiscTodos(profile.id, miscTodos, futureRoutineItemIds(miscTodos, routine.id, from)))
+    setRoutineDelete(null)
+  }
+
   const getDailyStats = useCallback(
     (day: number) => {
       const date = new Date(calYear, calMonth, day, 12, 0, 0, 0)
@@ -421,6 +471,8 @@ export function GoalDrilldownHome({
                 profileId={profile.id}
                 miscTodos={miscTodos}
                 onMiscChange={setMiscTodos}
+                routines={routines}
+                onRoutinesChange={setRoutines}
                 placeholder={placeholder}
                 onGoalSave={persist}
                 onCancel={() => setAddingTier(null)}
@@ -453,9 +505,17 @@ export function GoalDrilldownHome({
                   const u = updateAggregatedItemLabel(plans, it.planId, it.id, key, label)
                   if (u) persist(u)
                 }}
+                repeatLabel={repeatLabelOf(it.routineId)}
                 onLabelCommit={(label) => {
                   if (label.trim()) return
                   if (it.planId === MISC_PLAN_ID) {
+                    // 반복에서 나온 할 일은 "이 날만"인지 "반복 전체"인지 먼저 묻는다
+                    const routine = it.routineId ? routines.find((r) => r.id === it.routineId) : undefined
+                    const row = routine ? miscTodos.find((m) => m.id === it.id) : undefined
+                    if (routine && row) {
+                      setRoutineDelete({ item: row, routine })
+                      return
+                    }
                     setMiscTodos(removeMiscTodo(profile.id, miscTodos, it.id))
                     return
                   }
@@ -670,6 +730,37 @@ export function GoalDrilldownHome({
           onSave={handleTimeSave}
           onClose={() => setTimeEdit(null)}
         />
+      ) : null}
+      {routineDelete ? (
+        <div
+          className="goal-cal-picker-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setRoutineDelete(null)}
+        >
+          <div className="goal-cal-picker" onClick={(e) => e.stopPropagation()}>
+            <p className="goal-routine-choice-title">
+              "{routineDelete.item.label}"은 {describeRoutineDays(routineDelete.routine.days)} 반복이에요
+            </p>
+            <p className="goal-routine-choice-sub">어디까지 지울까요?</p>
+            <div className="goal-routine-choice">
+              <button type="button" className="goal-routine-choice-btn" onClick={skipThisDay}>
+                이 날만 빼기
+              </button>
+              <button type="button" className="goal-routine-choice-btn danger" onClick={stopRoutine}>
+                반복 끝내기
+              </button>
+              <button
+                type="button"
+                className="goal-routine-choice-btn ghost"
+                onClick={() => setRoutineDelete(null)}
+              >
+                그대로 두기
+              </button>
+            </div>
+            <p className="goal-routine-choice-note">반복을 끝내도 지난 기록은 그대로 남아요.</p>
+          </div>
+        </div>
       ) : null}
     </>
   )

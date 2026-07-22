@@ -288,11 +288,14 @@ export function GoalCheckRow({
   categoryId,
   onCategoryChange,
   drillLabel = '상세 보기',
+  repeatLabel,
 }: {
   done: boolean
   goalName?: string
   text: string
   timeRange?: string | null
+  /** 반복 일정이면 "매일"·"화·목" 같은 표시 */
+  repeatLabel?: string
   onToggle: () => void
   onRemove?: () => void
   onDrill?: () => void
@@ -332,17 +335,20 @@ export function GoalCheckRow({
         {done ? <CheckIcon /> : null}
       </button>
       <div className="goal-chk-body" style={{ flex: 1, minWidth: 0 }}>
-        {categoryOptions && categoryId && onCategoryChange ? (
-          <GoalCategoryPicker
-            options={categoryOptions}
-            value={categoryId}
-            onChange={onCategoryChange}
-            className="goal-chk-goal-picker"
-            menuClassName="goal-chk-goal-menu"
-          />
-        ) : goalName ? (
-          <div className="goal-chk-goal">{goalName}</div>
-        ) : null}
+        <div className="goal-chk-meta">
+          {categoryOptions && categoryId && onCategoryChange ? (
+            <GoalCategoryPicker
+              options={categoryOptions}
+              value={categoryId}
+              onChange={onCategoryChange}
+              className="goal-chk-goal-picker"
+              menuClassName="goal-chk-goal-menu"
+            />
+          ) : goalName ? (
+            <div className="goal-chk-goal">{goalName}</div>
+          ) : null}
+          {repeatLabel ? <span className="goal-chk-repeat">🔁 {repeatLabel}</span> : null}
+        </div>
         {onLabelChange ? (
           editing ? (
             <input

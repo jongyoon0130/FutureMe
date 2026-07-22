@@ -52,6 +52,8 @@ export type RemoteGoalDataRow = {
   owner_id: string
   plans: unknown[]
   misc_todos: unknown[]
+  /** 반복 일정 — 컬럼을 아직 안 만든 프로젝트도 있어서 없을 수 있다 */
+  routines?: unknown[] | null
   updated_at: number
 }
 
@@ -59,6 +61,7 @@ export type GoalDataPayload = {
   ownerId: string
   plans: unknown[]
   miscTodos: unknown[]
+  routines: unknown[]
   updatedAt: number
 }
 
@@ -115,20 +118,34 @@ export async function pushChatToCloud(
   noteCloudPushSuccess()
 }
 
+/** routines 컬럼을 아직 안 만든 프로젝트인지 (SUPABASE_SETUP.md의 alter table 미실행) */
+function isMissingRoutinesColumn(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false
+  return /routines/i.test(error.message ?? '') && /column|schema cache/i.test(error.message ?? '')
+}
+
 export async function pushGoalDataToCloud(payload: GoalDataPayload): Promise<void> {
   const ctx = requireClient()
   if (!ctx) return
 
-  const { error } = await ctx.client.from('futureme_goal_data').upsert(
-    {
-      user_id: ctx.userId,
-      owner_id: payload.ownerId,
-      plans: payload.plans,
-      misc_todos: payload.miscTodos,
-      updated_at: payload.updatedAt,
-    },
-    { onConflict: 'user_id' },
-  )
+  const base = {
+    user_id: ctx.userId,
+    owner_id: payload.ownerId,
+    plans: payload.plans,
+    misc_todos: payload.miscTodos,
+    updated_at: payload.updatedAt,
+  }
+
+  let { error } = await ctx.client
+    .from('futureme_goal_data')
+    .upsert({ ...base, routines: payload.routines }, { onConflict: 'user_id' })
+
+  // 컬럼이 없는 옛 프로젝트에서는 반복 일정만 빼고 나머지는 계속 동기화한다
+  if (isMissingRoutinesColumn(error)) {
+    console.info('[FutureMe/Cloud] routines 컬럼 없음 — 반복 일정 빼고 동기화 (SUPABASE_SETUP.md 참고)')
+    ;({ error } = await ctx.client.from('futureme_goal_data').upsert(base, { onConflict: 'user_id' }))
+  }
+
   if (error) {
     noteCloudPushFailure()
     throw error
@@ -140,7 +157,8 @@ export async function fetchRemoteGoalData(userId: string): Promise<RemoteGoalDat
   if (!supabase) return null
   const { data, error } = await supabase
     .from('futureme_goal_data')
-    .select('owner_id, plans, misc_todos, updated_at')
+    // routines 컬럼이 없는 프로젝트에서도 깨지지 않게 * 로 받는다
+    .select('*')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error

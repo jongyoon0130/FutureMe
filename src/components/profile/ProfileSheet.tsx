@@ -229,6 +229,8 @@ export function ProfileSheet({ profile: p, onClose, onDelete, onUpdate }: Props)
   const savedDilemmas = p.savedDilemmas ?? []
   const smallActions = p.smallActions ?? []
   const futureNotes = p.futureSelfNotes ?? []
+  // 채팅에서 저장 버튼을 걷어낸 뒤로는 새로 쌓이지 않는다 — 남은 건 예전 기록뿐
+  const hasPastRecords = savedDilemmas.length > 0 || smallActions.length > 0 || futureNotes.length > 0
 
   const saveEdits = () => {
     if (!onUpdate) return
@@ -372,8 +374,14 @@ export function ProfileSheet({ profile: p, onClose, onDelete, onUpdate }: Props)
                 ))}
               </div>
 
+              {hasPastRecords && (
+                <p className="text-[11px] text-muted px-1 -mb-1">
+                  아래는 지난 기록이에요. 지금은 새로 쌓지 않지만, 지우기 전까지 그대로 남아 있어요.
+                </p>
+              )}
+
               {savedDilemmas.length > 0 && (
-                <Section title="저장한 고민">
+                <Section title="저장한 고민 (지난 기록)">
                   <div className="space-y-2">
                     {savedDilemmas.map((d) => (
                       <div key={d.id} className="p-3 rounded-xl bg-surface-2/80 border border-border/70 flex items-start gap-2">
@@ -392,7 +400,7 @@ export function ProfileSheet({ profile: p, onClose, onDelete, onUpdate }: Props)
               )}
 
               {smallActions.length > 0 && (
-                <Section title="작은 행동">
+                <Section title="작은 행동 (지난 기록)">
                   <div className="space-y-2">
                     {smallActions.map((a) => (
                       <div key={a.id} className="p-3 rounded-xl bg-surface-2/80 border border-border/70 flex items-center gap-2.5">
@@ -420,7 +428,7 @@ export function ProfileSheet({ profile: p, onClose, onDelete, onUpdate }: Props)
               )}
 
               {futureNotes.length > 0 && (
-                <Section title="미래의 나 메모">
+                <Section title="미래의 나 메모 (지난 기록)">
                   <div className="space-y-2">
                     {futureNotes.map((n) => (
                       <div key={n.id} className="p-3 rounded-xl bg-surface-2/80 border border-border/70 flex items-start gap-2">

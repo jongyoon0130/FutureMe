@@ -28,7 +28,7 @@
 | 흔들리는 의지를 붙잡아주는 존재 | AI가 "5년 뒤 목표에 도달한 나"로서 담담하게 말함 (`buildSystemPrompt`) |
 | 미래가 생생해야 힘이 됨 | 온보딩에서 평범한 하루(typicalDay), 도달 경로(throughline)까지 구체적으로 수집 |
 | 말투가 진짜 나 같아야 함 | 말투 샘플 수집 + 자동 분석(stylometry), 채팅할수록 학습 |
-| 자기이해 → 용기 → 실행 | 고민 저장, "작은 행동" 제안·격려(courage 모드), 미래의 나 메모 |
+| 자기이해 → 용기 → 실행 | 대화에서 나온 말을 계획표로 보내기(메시지 꾹 누르기), 반복 일정(루틴), 완료 회고 |
 | 긴 대화도 맥락 유지 | 최근 16턴 원문 + 이전 대화는 AI 요약으로 압축 |
 | 데이터 신뢰 | 삭제 기록(tombstone)으로 "지운 프로필이 되살아나지 않게" 보장, 동기화 실패 시 배너 표시 |
 
@@ -93,7 +93,8 @@ SelfProfile ─── 프로필(채팅방) 하나의 전체 데이터
 │   futureVoiceSample, adviceLine(+adviceTone), weeklyAction …
 ├─ 말투: styleSamples(원문) + styleRules(자동 분석 규칙서)
 ├─ 대화 축적: insights(잠정 관찰), conversationSummary(오래된 대화 요약)
-├─ 성장 액션: savedDilemmas(고민), smallActions(작은 행동), futureSelfNotes(메모)
+├─ 지난 기록: savedDilemmas(고민), smallActions(작은 행동), futureSelfNotes(메모)
+│   — 지금은 새로 쌓지 않는다. 프로필의 "지난 기록"에서 보고 지울 수만 있다
 └─ 플래너: goals(목표), milestones(마일스톤), tasks(오늘·주간 행동), reflections(완료 회고)
 ```
 
@@ -131,7 +132,7 @@ sequenceDiagram
 
 - **정체성:** "너는 ○○의 5년 뒤(N세) 미래의 나다. AI·상담사·점쟁이가 아니다." 예언 금지, "지나와 보니 —" 톤 강제
 - **동적 블록:** 이번 말 분석 결과, 미래 프로필 전체(`describeFutureSelf`), 말투 규칙, 대화 요약, 인사이트
-- **답변 모드** (`ReplyMode`): `future`(기본 — 미래의 나 관점) · `courage`(작은 행동 밀어주기) · `reflect`(순수 반영)
+- **답변 모드** (`ReplyMode`): `future`(기본 — 미래의 나 관점) · `reflect`(순수 반영)
 - **길이·금지:** 한 턴 최대 3문장, 번호·불릿 금지, user 말 되풀이 금지
 
 ### 6-3. 메모리 2단 구조
@@ -213,7 +214,9 @@ bun run lint           # Oxlint
 | [src/lib/syncOrchestrator.ts](src/lib/syncOrchestrator.ts) | 로컬↔클라우드 병합 규칙 |
 | [src/lib/syncStatus.ts](src/lib/syncStatus.ts) | 클라우드 저장 실패 상태 (UI 배너용) |
 | [src/lib/chatReplyPlan.ts](src/lib/chatReplyPlan.ts) | 어떤 메시지에 답할지·재시도 계획 |
-| [src/lib/growthStore.ts](src/lib/growthStore.ts) | 고민/작은 행동/메모 (순수 함수) |
+| [src/lib/growthStore.ts](src/lib/growthStore.ts) | 지난 기록(고민/작은 행동/메모) 정리 — 새로 쌓지는 않는다 |
+| [src/lib/chatToPlan.ts](src/lib/chatToPlan.ts) | 채팅 메시지 → 계획표 확인 카드 초안 |
+| [src/lib/goalRoutines.ts](src/lib/goalRoutines.ts) | 반복 일정(루틴) — 요일 규칙 + 2주치 자동 생성 |
 | [src/components/chat/ChatScreen.tsx](src/components/chat/ChatScreen.tsx) | 채팅 UI, API 호출, 설정, 백업 |
 | [src/components/onboarding/ChatOnboarding.tsx](src/components/onboarding/ChatOnboarding.tsx) | 온보딩 대화 UI |
 | [tests/](tests/) | bun test — 응답 계획·tombstone 병합 규칙 |
@@ -234,7 +237,8 @@ bun run lint           # Oxlint
 | stylometry | 텍스트에서 말투 규칙(반말, 어미, ㅋㅋ 빈도 등) 자동 추출 |
 | insight | 대화에서 조심스럽게 쌓는 잠정 관찰 |
 | tombstone | 삭제 기록 — 지운 프로필이 동기화로 되살아나지 않게 하는 표식 |
-| ReplyMode | 답변 관점 (future/courage/reflect) |
+| ReplyMode | 답변 관점 (future/reflect) |
+| 루틴 | 요일 반복 일정 — 등록해두면 앞으로 2주치 할 일이 자동으로 생긴다 |
 
 ---
 

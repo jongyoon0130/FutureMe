@@ -38,14 +38,19 @@ create policy "settings own" on public.futureme_settings
 
 create index if not exists futureme_profiles_user_updated on public.futureme_profiles (user_id, updated_at desc);
 
--- 홈 목표·할 일 (goal-plans, misc todos)
+-- 홈 목표·할 일 (goal-plans, misc todos, 반복 일정)
 create table if not exists public.futureme_goal_data (
   user_id uuid primary key references auth.users (id) on delete cascade,
   owner_id text not null,
   plans jsonb not null default '[]'::jsonb,
   misc_todos jsonb not null default '[]'::jsonb,
+  routines jsonb not null default '[]'::jsonb,
   updated_at bigint not null
 );
+
+-- 이미 테이블을 만든 프로젝트용 (반복 일정 추가분)
+alter table public.futureme_goal_data
+  add column if not exists routines jsonb not null default '[]'::jsonb;
 
 alter table public.futureme_goal_data enable row level security;
 

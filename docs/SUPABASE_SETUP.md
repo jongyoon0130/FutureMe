@@ -7,6 +7,13 @@
 1. [supabase.com](https://supabase.com) → **New project** (예: `futureme`)
 2. **SQL Editor** → `supabase/schema.sql` 내용 붙여넣고 **Run**
    - 이미 프로젝트가 있으면, 파일 맨 아래 `futureme_goal_data` 블록만 추가 실행해도 됩니다.
+   - **2026-07-22 추가:** 반복 일정용 `routines` 컬럼. 이미 테이블을 만들었다면 아래 한 줄만 더 실행하세요.
+     안 해도 앱은 돌아갑니다 — 반복 일정만 이 기기에 남고 클라우드로 안 넘어갑니다.
+
+     ```sql
+     alter table public.futureme_goal_data
+       add column if not exists routines jsonb not null default '[]'::jsonb;
+     ```
 3. **Project Settings → API** 에서 복사:
    - Project URL → `VITE_SUPABASE_URL`
    - anon public key → `VITE_SUPABASE_ANON_KEY`

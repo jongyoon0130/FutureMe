@@ -31,7 +31,7 @@ import {
   resetProfilePromptBulk,
   shouldUseLitePrompt,
 } from '../../lib/selfEngine'
-import type { ApiCheckResult, ChatTodoDirective } from '../../lib/selfEngine'
+import type { ApiCheckResult } from '../../lib/selfEngine'
 import {
   loadChatAsync,
   saveChat,
@@ -53,7 +53,7 @@ import {
 import { addMiscTodo, loadMiscTodos } from '../../lib/goalMiscTodos'
 import { getGoalAppOwnerId } from '../../lib/goalAppOwner'
 import { GOAL_DATA_SYNC_EVENT } from '../../lib/goalDataSync'
-import { parseScheduleRequest } from '../../lib/chatScheduleParse'
+import { dateKeyOf, shiftDateKey, todoDraftFromMessage, type PendingTodo } from '../../lib/chatToPlan'
 
 function readInitialApiStatus(): 'idle' | ApiCheckResult {
   const key = loadApiKey()?.trim() ?? ''
@@ -68,6 +68,12 @@ function maskApiKeyDisplay(key: string): string {
   if (key.length <= 4) return '•'.repeat(key.length)
   return `···${key.slice(-4)}`
 }
+
+const TODO_DATE_CHIPS = [
+  { label: '오늘', offset: 0 },
+  { label: '내일', offset: 1 },
+  { label: '모레', offset: 2 },
+] as const
 
 /** 일정 확인 카드용 날짜 표기 — "내일 (7/18 토)" */
 function formatTodoDate(date: string, now = new Date()): string {
@@ -174,8 +180,8 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   /** 이번 채팅 세션에서 API 실패 직후에만 표시 (나갔다 들어오면 안 뜸) */
   const [retryBannerMsgId, setRetryBannerMsgId] = useState<string | null>(null)
-  /** 미래의 나가 제안한 일정 — user가 눌러야 실제로 계획표에 들어간다 */
-  const [pendingTodo, setPendingTodo] = useState<ChatTodoDirective | null>(null)
+  /** 계획표로 보낼 메시지 — user가 "추가"를 눌러야 실제로 들어간다 */
+  const [pendingTodo, setPendingTodo] = useState<PendingTodo | null>(null)
 
   const exitSelectMode = () => {
     setSelectMode(false)
@@ -205,6 +211,16 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     } else {
       setSelectedIds(new Set(messages.map((m) => m.id)))
     }
+  }
+
+  /** 고른 메시지 하나를 계획표 확인 카드로 — 저장은 카드에서 "추가"를 눌러야 일어난다 */
+  const sendSelectedToPlan = () => {
+    if (selectedIds.size !== 1) return
+    const picked = messages.find((m) => selectedIds.has(m.id))
+    const draft = picked ? todoDraftFromMessage(picked.content) : null
+    if (!draft) return
+    exitSelectMode()
+    setPendingTodo(draft)
   }
 
   const deleteSelectedMessages = async () => {
@@ -476,10 +492,6 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
         focusInstruction: plan.focusInstruction,
       })
       reply = res.text
-      // 일정 추가 확인 카드 — 모델 지시문이 있으면 그걸, 없으면 앱이 직접 파싱한 걸로.
-      // (모델이 지시문을 안 뱉어도 카드가 뜨게 — user가 누를 때만 저장)
-      const todo = res.todo ?? parseScheduleRequest(plan.focusContent, new Date())
-      if (todo) setPendingTodo(todo)
       chatOk = true
       setLastUsageTick(Date.now())
     } catch (e) {
@@ -647,6 +659,7 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
     flashToast('계획표에 추가됨 📅')
   }
 
+  const todayKey = dateKeyOf(new Date())
   const apiHeavyProfile = shouldUseLitePrompt(self, messages.length)
   const retryBannerMessage =
     retryBannerMsgId != null
@@ -1061,12 +1074,20 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
       )}
 
       {selectMode ? (
-        <div className="px-4 py-3 border-t border-border/60 bg-surface shrink-0">
+        <div className="px-4 py-3 border-t border-border/60 bg-surface shrink-0 flex gap-2">
+          <button
+            type="button"
+            onClick={sendSelectedToPlan}
+            disabled={selectedIds.size !== 1}
+            className="flex-1 py-3.5 rounded-2xl text-[15px] font-medium transition-colors disabled:opacity-35 disabled:cursor-not-allowed bg-surface-2 text-ink hover:bg-accent/10 border border-border/50"
+          >
+            계획표에 넣기
+          </button>
           <button
             type="button"
             onClick={deleteSelectedMessages}
             disabled={selectedIds.size === 0}
-            className="w-full py-3.5 rounded-2xl text-[15px] font-medium transition-colors disabled:opacity-35 disabled:cursor-not-allowed bg-surface-2 text-status-error hover:bg-status-error/10 border border-border/50"
+            className="flex-1 py-3.5 rounded-2xl text-[15px] font-medium transition-colors disabled:opacity-35 disabled:cursor-not-allowed bg-surface-2 text-status-error hover:bg-status-error/10 border border-border/50"
           >
             삭제
           </button>
@@ -1095,36 +1116,63 @@ export function ChatScreen({ profileId, profile, onBack, onProfileDeleted, onPro
           </div>
         ) : null}
         {pendingTodo ? (
-          <div className="px-3 pt-2.5 pb-1.5 border-b border-border/40 bg-accent/5">
-            <p className="text-[11px] text-muted mb-1.5">계획표에 이거 넣을까? (고쳐도 돼)</p>
-            <div className="flex items-center gap-1.5">
-              <div className="flex-1 min-w-0 px-2.5 py-1.5 rounded-xl bg-surface border border-accent/30">
+          <div className="px-3 pt-2.5 pb-2 border-b border-border/40 bg-accent/5">
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[11px] text-muted">계획표에 넣을 내용 (고쳐도 돼)</p>
+              <button
+                type="button"
+                onClick={() => setPendingTodo(null)}
+                className="w-6 h-6 -mr-1 flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-ink/5 transition-colors"
+                aria-label="계획표에 넣기 취소"
+              >
+                ✕
+              </button>
+            </div>
+            <input
+              type="text"
+              value={pendingTodo.title}
+              onChange={(e) => setPendingTodo({ ...pendingTodo, title: e.target.value })}
+              className="w-full px-2.5 py-2 rounded-xl bg-surface border border-accent/30 text-[13px] text-ink focus:outline-none focus:border-accent/60"
+              aria-label="할 일 제목"
+            />
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <div className="flex gap-1 flex-1 min-w-0">
+                {TODO_DATE_CHIPS.map((chip) => {
+                  const key = shiftDateKey(todayKey, chip.offset)
+                  const active = pendingTodo.date === key
+                  return (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => setPendingTodo({ ...pendingTodo, date: key })}
+                      className={`px-2.5 py-1.5 rounded-lg text-[12px] transition-colors ${
+                        active
+                          ? 'bg-accent text-surface'
+                          : 'bg-surface border border-border/50 text-ink/80 hover:border-accent/40'
+                      }`}
+                    >
+                      {chip.label}
+                    </button>
+                  )
+                })}
                 <input
-                  type="text"
-                  value={pendingTodo.title}
-                  onChange={(e) => setPendingTodo({ ...pendingTodo, title: e.target.value })}
-                  className="w-full bg-transparent text-[12px] text-ink focus:outline-none"
-                  aria-label="일정 제목"
+                  type="date"
+                  value={pendingTodo.date}
+                  onChange={(e) => e.target.value && setPendingTodo({ ...pendingTodo, date: e.target.value })}
+                  className="min-w-0 flex-1 px-2 py-1.5 rounded-lg bg-surface border border-border/50 text-[12px] text-ink/80 focus:outline-none focus:border-accent/40"
+                  aria-label="날짜 고르기"
                 />
-                <p className="text-[11px] text-muted mt-0.5">{formatTodoDate(pendingTodo.date)}</p>
               </div>
               <button
                 type="button"
                 onClick={confirmPendingTodo}
                 disabled={!pendingTodo.title.trim()}
-                className="shrink-0 px-3 py-2 rounded-xl bg-accent text-surface text-[12px] font-medium disabled:opacity-40"
+                className="shrink-0 px-3.5 py-1.5 rounded-lg bg-accent text-surface text-[12px] font-medium disabled:opacity-40"
               >
                 추가
               </button>
-              <button
-                type="button"
-                onClick={() => setPendingTodo(null)}
-                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink hover:bg-ink/5 transition-colors"
-                aria-label="일정 추가 취소"
-              >
-                ✕
-              </button>
             </div>
+            <p className="text-[11px] text-muted mt-1">{formatTodoDate(pendingTodo.date)}에 들어가요</p>
           </div>
         ) : null}
       {toast && (

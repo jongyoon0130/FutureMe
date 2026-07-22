@@ -469,42 +469,6 @@ function describeGrowthTouch(p: SelfProfile, userMessage: string): string {
 // ---------------------------------------------------------------------------
 const INSIGHT_KINDS: InsightKind[] = ['state', 'value', 'preference', 'fact']
 
-// ---------------------------------------------------------------------------
-// 작은 행동 제안 (C) — 최근 대화에서 "오늘 할 수 있는 한 걸음" 하나 뽑기
-// ---------------------------------------------------------------------------
-export async function suggestSmallAction(
-  messages: ApiDialogueMessage[],
-  apiKey: string,
-  model: string = DEFAULT_GEMINI_MODEL,
-): Promise<string> {
-  if (!apiKey.trim() || !messages.length) return ''
-  const recent = filterMessagesForApi(messages).slice(-8)
-  if (!recent.length) return ''
-  const convo = recent.map((m) => `${m.role === 'user' ? '나' : '또다른나'}: ${m.content}`).join('\n')
-  const sys = `아래 대화에서 '나'가 고민·망설이는 것에 대해, 오늘 당장 5분 안에 할 수 있는 아주 작은 행동 하나만 제안하라.
-- 거창한 계획·여러 개 금지. 딱 한 가지 구체적 행동.
-- 한국어 반말, 20자 이내. 예: "여사친한테 안부 톡 한 통", "이력서 첫 줄만 고치기"
-- 행동 그 자체만 출력. 설명·따옴표·마침표 없이.`
-  try {
-    const data = await geminiGenerate(
-      apiKey,
-      resolveModel(model),
-      {
-        systemInstruction: { parts: [{ text: sys }] },
-        contents: [{ role: 'user', parts: [{ text: convo }] }],
-        generationConfig: { temperature: 0.6, maxOutputTokens: 40, thinkingConfig: { thinkingBudget: 0 } },
-      },
-      'suggestAction',
-    )
-    return extractGeminiText(data)
-      .replace(/^["'\s]+|["'.\s]+$/g, '')
-      .split('\n')[0]
-      .slice(0, 40)
-  } catch {
-    return ''
-  }
-}
-
 export async function analyzeInsightsWithAI(
   messages: { role: 'user' | 'assistant'; content: string }[],
   apiKey: string,
@@ -1205,14 +1169,12 @@ function describeFutureSelf(p: SelfProfile, lite = false): string {
 }
 
 // 답변 관점 모드: Future Me 기본 = future (미래의 나)
-export type ReplyMode = 'reflect' | 'future' | 'courage'
+export type ReplyMode = 'reflect' | 'future'
 
 const MODE_OVERLAY: Record<ReplyMode, string> = {
   reflect: '',
   future:
     `\n## 지금은 "${FUTURE_YEARS_AHEAD}년 뒤 미래의 나" 관점\n- 너는 user가 온보딩에서 만든 **${FUTURE_YEARS_AHEAD}년 뒤의 나**다. 예언·점쟁이 금지.\n- Future memory(throughline)·typicalDay·futureVoiceSample을 **말투·기억의 뼈대**로 삼되, 온보딩 문장을 그대로 낭독하지 말 것.\n- 지금의 나보다 담담하고 경험에서 온 말투. ㅋㅋ/ㅠㅠ는 줄이되, user styleSample과의 **연속성**은 유지.\n- "그때의 나한테 해주고 싶은 말" 톤으로, 이미 그 길을 걸어온 사람처럼 말한다.`,
-  courage:
-    '\n## 지금은 "용기" 관점\n- user가 방금 작은 실행 하나를 정했거나, 미루는 중이다. 판단·공감은 딱 1문장까지만.\n- 나머지는 짧게 밀어주기·격려. 거창한 계획·여러 선택지 금지.\n- 행동명을 작은따옴표+대시(`\'…\' —`)로 되따라치지 말 것. 행동과 안 맞으면 "5분" 같은 시간을 붙이지 말 것.',
 }
 
 export function buildSystemPrompt(
@@ -1370,7 +1332,7 @@ ${FILLER_OVERUSE_BAN}
 ${NO_ECHO_BAN}
 ${PROFILE_SURFACE_BAN}
 ${knownFacts ? FACT_GROUNDING_BAN : ''}
-${lite ? '' : TODO_DIRECTIVE_GUIDE}
+${lite ? '' : TODO_HANDOFF_GUIDE}
 
 ## 예시 (구조만 — 말투·어휘 복사 X)
 ${describeBehaviorExamples(lite)}
@@ -1860,50 +1822,17 @@ export function stripDateLabelPrefix(text: string): string {
   return out.trim()
 }
 
-export type ChatTodoDirective = { date: string; title: string }
+/** 채팅 응답 */
+export type AiReply = { text: string }
 
-/** 채팅 응답 — 보여줄 본문 + (있으면) 일정 추가 제안 */
-export type AiReply = { text: string; todo: ChatTodoDirective | null }
-
-const TODO_DIRECTIVE_RE = /\[\[\s*TODO\s*(\{[\s\S]*?\})\s*\]\]/
-
-/** 답변 원문에서 지시문을 떼어내고, 유효할 때만 todo를 돌려준다 */
-export function extractTodoDirective(
-  raw: string,
-  now = new Date(),
-): { text: string; todo: ChatTodoDirective | null } {
-  const match = raw.match(TODO_DIRECTIVE_RE)
-  if (!match) return { text: raw, todo: null }
-
-  const text = raw.replace(TODO_DIRECTIVE_RE, '').trim()
-  try {
-    const data = JSON.parse(match[1]) as { date?: unknown; title?: unknown }
-    const date = typeof data.date === 'string' ? data.date.trim() : ''
-    const title = typeof data.title === 'string' ? data.title.trim() : ''
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !title) return { text, todo: null }
-
-    const target = new Date(`${date}T12:00:00`)
-    if (Number.isNaN(target.getTime())) return { text, todo: null }
-    const base = new Date(now)
-    base.setHours(12, 0, 0, 0)
-    const diff = Math.round((target.getTime() - base.getTime()) / 86400000)
-    // 상식 범위 밖(과거·먼 미래)이면 모델이 날짜를 잘못 잡은 것 — 버린다
-    if (diff < -1 || diff > 60) return { text, todo: null }
-
-    return { text, todo: { date, title: title.slice(0, 60) } }
-  } catch {
-    return { text, todo: null }
-  }
-}
-
-const TODO_DIRECTIVE_GUIDE = `
-## 일정 추가 (부탁받았을 때만 — '사실' 규칙과 별개)
-- 위 '사실·할루시네이션' 규칙은 **기존 계획을 지어내 보고하지 말라**는 것. 반대로, user가 **방금 알려준 새 일정을 적어두는 건 사실 창작이 아니라 받아적기**다 — 아래처럼 실제로 해줄 수 있다. "난 시스템에 못 넣어" 같은 말 금지.
-- user가 "일정에 적어줘 / 넣어줘 / 추가해줘"처럼 **명시적으로 부탁**하면, 답변 **맨 끝**에 딱 한 줄:
-  [[TODO {"date":"YYYY-MM-DD","title":"제목"}]]
-- 날짜는 위 '지금' 시각 기준으로 계산한다 (오늘·내일·모레·이번 주 토요일 등). 날짜를 특정 못 하면 오늘로. 시간이 있으면 제목에 넣는다 — 예: "풋살 (오후 1–3시)".
-- 이 줄은 user에게 **보이지 않고 확인 카드로 바뀐다**. 그러니 "넣어뒀어"라고 단정하지 말고 **"이거 맞으면 넣을게"** 톤으로 말한다.
-- 부탁하지 않았으면 절대 붙이지 않는다. 한 번에 하나만.`
+// 일정 추가는 더 이상 모델이 하지 않는다. 예전엔 답변 끝에 숨은 [[TODO]] 지시문을
+// 붙이게 했지만, 모델이 그걸 안 뱉으면 카드가 안 떴다("적어둘게"라고 말만 함).
+// 지금은 **user가 메시지를 꾹 눌러 "계획표에 넣기"** 를 고르는 방식 — 모델 준수에
+// 기대지 않고, 미래의 나가 비서 노릇을 하지도 않는다.
+const TODO_HANDOFF_GUIDE = `
+## 일정을 적어달라고 하면
+- 너는 계획표에 직접 못 넣는다. 대신 **"그 말 꾹 누르면 계획표로 보낼 수 있어"** 라고 한 번만 알려준다. "넣어뒀어"라고 단정하는 건 거짓말이라 금지.
+- 안내는 짧게 한 줄. 매번 반복하지 말고, 부탁받았을 때만.`
 
 export type ApiDialogueMessage = {
   role: 'user' | 'assistant'
@@ -2389,16 +2318,14 @@ export async function fetchAIResponse(
         'chatReply',
       )
 
-      const raw = extractGeminiText(data)
-      // 지시문은 문장 다듬기(3문장 제한 등) 전에 떼어낸다 — 안 그러면 잘려 나간다
-      const { text: body, todo } = extractTodoDirective(raw ?? '')
+      const body = extractGeminiText(data) ?? ''
       const text = body
         ? stripDateLabelPrefix(stripFactualSearchBleed(enforceReplyLimits(body, lastUser?.content)))
         : ''
       if (text) {
         if (hasKnownFacts) {
-          // user가 방금 말한 시간·추가 요청 제목은 지어낸 게 아니다 → 예외로 허용
-          const allow = `${lastUser?.content ?? ''} ${todo?.title ?? ''}`
+          // user가 방금 말한 시간은 지어낸 게 아니다 → 예외로 허용
+          const allow = lastUser?.content ?? ''
           const audit = auditReplyAgainstKnownFacts(text, new Date(), allow)
           if (!audit.ok) {
             if (!strictRetry) {
@@ -2409,10 +2336,10 @@ export async function fetchAIResponse(
             }
             // 재시도까지 실패 → 앱이 직접 지운다. 거짓 시간은 절대 유저에게 안 보낸다.
             console.info('[FutureMe/Gemini] fact audit failed again, stripping', audit.reason)
-            return { text: stripInventedTimes(text, new Date(), allow), todo }
+            return { text: stripInventedTimes(text, new Date(), allow) }
           }
         }
-        return { text, todo }
+        return { text }
       }
       if (attempt === 0) {
         console.info('[FutureMe/Gemini] retry chatReply (empty response)')

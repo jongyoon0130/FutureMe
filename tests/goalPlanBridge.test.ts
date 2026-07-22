@@ -275,6 +275,27 @@ describe('fact grounding — 할루시네이션 방지', () => {
     expect(auditReplyAgainstKnownFacts('오늘 풋살 하나 적혀 있어', SUN).ok).toBe(true)
   })
 
+  it('timeStart/timeEnd가 known facts·audit corpus에 포함된다', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([
+        {
+          id: 'm1',
+          label: '풋살',
+          done: false,
+          tier: 'daily',
+          periodKey: '2026-07-19',
+          timeStart: '18:00',
+          timeEnd: '20:00',
+        },
+      ]),
+    )
+    const compact = describeKnownFactsBlock(SUN, true)
+    expect(compact).toContain('18:00 ~ 20:00')
+    expect(auditReplyAgainstKnownFacts('오늘 18:00부터 20:00까지 풋살이야', SUN).ok).toBe(true)
+  })
+
   it('describeGoalBoardForPrompt에 grounding preamble이 있다', () => {
     const owner = seedOwner()
     localStorage.setItem(
@@ -296,6 +317,26 @@ describe('stripInventedTimes — 최후의 안전망 (할루시네이션 최우�
     expect(out).not.toContain('6시')
     expect(out).not.toContain('8시')
     expect(out).toContain('풋살')
+  })
+
+  it('데이터에 structured timeStart/timeEnd가 있으면 건드리지 않는다', () => {
+    const owner = seedOwner()
+    localStorage.setItem(
+      `goal-misc-todos-${owner}`,
+      JSON.stringify([
+        {
+          id: 'm1',
+          label: '풋살',
+          done: false,
+          tier: 'daily',
+          periodKey: '2026-07-16',
+          timeStart: '13:00',
+          timeEnd: '15:00',
+        },
+      ]),
+    )
+    const out = stripInventedTimes('13:00부터 15:00까지 풋살이야.', NOW)
+    expect(out).toContain('13:00')
   })
 
   it('데이터에 실제 시간이 있으면 건드리지 않는다', () => {

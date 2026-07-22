@@ -15,6 +15,7 @@ import {
   type MiscTodoItem,
 } from './goalMiscTodos'
 import { dayCloseStreak, dayKey, loadDayCloses } from './dayClose'
+import { formatTaskTimeRange } from './goalTaskTime'
 
 const OWNER_KEY = 'goal-app-owner-id'
 const PLANS_PREFIX = 'goal-plans-'
@@ -213,6 +214,8 @@ function miscAggregatedLite(items: MiscTodoItem[], date: Date): {
       planId: MISC_PLAN_ID,
       planTitle: MISC_PLAN_TITLE,
       tier,
+      timeStart: it.timeStart,
+      timeEnd: it.timeEnd,
     }))
 
   return {
@@ -234,7 +237,9 @@ function describeMotivation(plan: GoalPlan): string[] {
 function formatTaskLine(item: AggregatedItem): string {
   const status = item.done ? '[완료]' : '[ ]'
   const goal = clip(item.planTitle, 24)
-  return `  - ${status} ${goal} — ${clip(item.label, 60)}`
+  const time = formatTaskTimeRange(item.timeStart, item.timeEnd)
+  const timePart = time ? ` · ${time}` : ''
+  return `  - ${status} ${goal} — ${clip(item.label, 60)}${timePart}`
 }
 
 function formatTaskTier(title: string, items: AggregatedItem[]): string[] {
@@ -275,6 +280,7 @@ export function dailyItemsForDate(plans: GoalPlan[], misc: MiscTodoItem[], date:
 const GROUNDING_PREAMBLE = [
   '## 알고 있는 것 (유일한 사실 근거 — 이 밖은 모름)',
   '- **시간·장소·날짜·할 일명·이유**는 아래에 **글자 그대로** 있을 때만 말할 것.',
+  '- 일간 할 일 줄 끝의 **`HH:MM ~ HH:MM`**(또는 `HH:MM ~`, `~ HH:MM`)은 사용자가 지정한 **예정 시간**이다.',
   '- 대화 맥락·추측·그럴듯한 보완·이전 턴 네 말은 **사실 근거가 아님**. 틀렸으면 인정하고 아래만 다시.',
   '- "이번 주/달 목표"와 "오늘 일간 할 일"은 **다름** — 섞지 말 것.',
 ].join('\n')
@@ -307,6 +313,12 @@ export function collectKnownFactCorpus(now = new Date()): string {
     d.setDate(d.getDate() + i)
     for (const it of dailyItemsForDate(plans, misc, d)) {
       parts.push(it.label, it.planTitle)
+      const time = formatTaskTimeRange(it.timeStart, it.timeEnd)
+      if (time) {
+        parts.push(time)
+        if (it.timeStart?.trim()) parts.push(it.timeStart.trim())
+        if (it.timeEnd?.trim()) parts.push(it.timeEnd.trim())
+      }
     }
   }
 

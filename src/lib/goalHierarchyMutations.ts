@@ -123,6 +123,38 @@ export function setDayItemLabel(plan: GoalPlan, weekId: string | null, dayId: st
   })
 }
 
+export function setDayItemTime(
+  plan: GoalPlan,
+  weekId: string | null,
+  dayId: string,
+  itemId: string,
+  timeStart?: string,
+  timeEnd?: string,
+): GoalPlan {
+  return withHierarchy(plan, (h) => {
+    const mapDay = (d: PlanDay): PlanDay =>
+      d.id !== dayId
+        ? d
+        : {
+            ...d,
+            items: d.items.map((it) => {
+              if (it.id !== itemId) return it
+              const next = { ...it }
+              if (timeStart?.trim()) next.timeStart = timeStart.trim()
+              else delete next.timeStart
+              if (timeEnd?.trim()) next.timeEnd = timeEnd.trim()
+              else delete next.timeEnd
+              return next
+            }),
+          }
+    if (h.horizon === 'day-only') return { ...h, days: h.days.map(mapDay) }
+    return {
+      ...h,
+      weeks: h.weeks.map((w) => (w.id !== weekId ? w : { ...w, days: w.days.map(mapDay) })),
+    }
+  })
+}
+
 export function upsertDayItemLabel(plan: GoalPlan, weekId: string | null, dayId: string, itemId: string, label: string): GoalPlan {
   const h = plan.hierarchy
   if (!h) return plan
@@ -318,6 +350,33 @@ export function updateAggregatedItemLabel(
   return null
 }
 
+export function updateAggregatedItemTime(
+  plans: GoalPlan[],
+  planId: string,
+  itemId: string,
+  tier: 'daily' | 'weekly' | 'monthly',
+  timeStart?: string,
+  timeEnd?: string,
+): GoalPlan | null {
+  if (tier !== 'daily') return null
+  const plan = plans.find((p) => p.id === planId)
+  if (!plan?.hierarchy) return null
+  const h = plan.hierarchy
+
+  if (h.horizon === 'day-only') {
+    for (const d of h.days) {
+      if (d.items.some((i) => i.id === itemId)) return setDayItemTime(plan, null, d.id, itemId, timeStart, timeEnd)
+    }
+  } else {
+    for (const w of h.weeks) {
+      for (const d of w.days) {
+        if (d.items.some((i) => i.id === itemId)) return setDayItemTime(plan, w.id, d.id, itemId, timeStart, timeEnd)
+      }
+    }
+  }
+  return null
+}
+
 /** @deprecated */
 export function toggleMonthItem(plan: GoalPlan, itemId: string): GoalPlan {
   const m = plan.hierarchy?.months[0]
@@ -469,6 +528,8 @@ export function insertTierGoalAtDate(
   tier: 'daily' | 'weekly' | 'monthly',
   label: string,
   done = false,
+  timeStart?: string,
+  timeEnd?: string,
 ): GoalPlan | null {
   if (!plan.hierarchy || !label.trim()) return null
   const slots = resolveDateSlots(plan.hierarchy, date)
@@ -498,6 +559,9 @@ export function insertTierGoalAtDate(
   }
 
   if (!next || !itemId) return null
+  if (tier === 'daily' && slots.dayId && (timeStart?.trim() || timeEnd?.trim())) {
+    next = setDayItemTime(next, slots.dayWeekId, slots.dayId, itemId, timeStart, timeEnd)
+  }
   if (done) return setAggregatedItemDone(next, itemId, tier, true) ?? next
   return next
 }

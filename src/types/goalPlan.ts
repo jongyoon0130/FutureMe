@@ -89,6 +89,9 @@ export interface PlanCheckItem {
   label: string
   done: boolean
   note?: string
+  /** 일간 할 일 — 24h HH:mm */
+  timeStart?: string
+  timeEnd?: string
 }
 
 export interface PlanPhase {

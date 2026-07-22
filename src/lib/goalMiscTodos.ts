@@ -13,6 +13,9 @@ export interface MiscTodoItem {
   done: boolean
   tier: 'daily' | 'weekly' | 'monthly'
   periodKey: string
+  /** 일간 — 24h HH:mm */
+  timeStart?: string
+  timeEnd?: string
 }
 
 function storageKey(profileId: string): string {
@@ -71,19 +74,21 @@ export function insertMiscTodo(
   date: Date,
   label: string,
   done = false,
+  timeStart?: string,
+  timeEnd?: string,
 ): MiscTodoItem[] {
   const trimmed = label.trim()
   if (!trimmed) return items
-  const next = [
-    ...items,
-    {
-      id: uid(),
-      label: trimmed,
-      done,
-      tier,
-      periodKey: periodKeyForTier(tier, date),
-    },
-  ]
+  const row: MiscTodoItem = {
+    id: uid(),
+    label: trimmed,
+    done,
+    tier,
+    periodKey: periodKeyForTier(tier, date),
+  }
+  if (timeStart?.trim()) row.timeStart = timeStart.trim()
+  if (timeEnd?.trim()) row.timeEnd = timeEnd.trim()
+  const next = [...items, row]
   saveMiscTodos(profileId, next)
   return next
 }
@@ -111,6 +116,26 @@ export function updateMiscTodoLabel(
   return next
 }
 
+export function updateMiscTodoTime(
+  profileId: string,
+  items: MiscTodoItem[],
+  itemId: string,
+  timeStart?: string,
+  timeEnd?: string,
+): MiscTodoItem[] {
+  const next = items.map((it) => {
+    if (it.id !== itemId) return it
+    const merged: MiscTodoItem = { ...it }
+    if (timeStart?.trim()) merged.timeStart = timeStart.trim()
+    else delete merged.timeStart
+    if (timeEnd?.trim()) merged.timeEnd = timeEnd.trim()
+    else delete merged.timeEnd
+    return merged
+  })
+  saveMiscTodos(profileId, next)
+  return next
+}
+
 function toAggregated(items: MiscTodoItem[]): AggregatedItem[] {
   return items
     .filter((it) => it.label.trim())
@@ -121,6 +146,8 @@ function toAggregated(items: MiscTodoItem[]): AggregatedItem[] {
     planId: MISC_PLAN_ID,
     planTitle: MISC_PLAN_TITLE,
     tier: it.tier,
+    timeStart: it.timeStart,
+    timeEnd: it.timeEnd,
   }))
 }
 

@@ -278,6 +278,7 @@ export function GoalCheckRow({
   done,
   goalName,
   text,
+  timeRange,
   onToggle,
   onRemove,
   onDrill,
@@ -286,10 +287,12 @@ export function GoalCheckRow({
   categoryOptions,
   categoryId,
   onCategoryChange,
+  drillLabel = '상세 보기',
 }: {
   done: boolean
   goalName?: string
   text: string
+  timeRange?: string | null
   onToggle: () => void
   onRemove?: () => void
   onDrill?: () => void
@@ -298,6 +301,7 @@ export function GoalCheckRow({
   categoryOptions?: GoalCategoryOption[]
   categoryId?: string
   onCategoryChange?: (planId: string) => void
+  drillLabel?: string
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(text)
@@ -371,12 +375,13 @@ export function GoalCheckRow({
         ) : (
           <span className="goal-txt">{text}</span>
         )}
+        {timeRange ? <span className="goal-chk-time">{timeRange}</span> : null}
       </div>
       {onDrill ? (
         <button
           type="button"
           className="goal-chk-drill"
-          aria-label="상세 보기"
+          aria-label={drillLabel}
           onClick={(e) => {
             e.stopPropagation()
             onDrill()

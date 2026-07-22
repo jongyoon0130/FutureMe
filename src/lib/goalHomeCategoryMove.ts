@@ -47,6 +47,8 @@ export function moveHomeAggregatedItem(args: {
   if (!label) return null
 
   const done = item.done
+  const timeStart = item.timeStart
+  const timeEnd = item.timeEnd
   let nextPlans = plans
   let nextMisc = miscTodos
 
@@ -59,13 +61,13 @@ export function moveHomeAggregatedItem(args: {
   }
 
   if (targetPlanId === MISC_PLAN_ID) {
-    nextMisc = insertMiscTodo(profileId, nextMisc, tier, date, label, done)
+    nextMisc = insertMiscTodo(profileId, nextMisc, tier, date, label, done, timeStart, timeEnd)
     return { plans: nextPlans, miscTodos: nextMisc }
   }
 
   const plan = nextPlans.find((p) => p.id === targetPlanId)
   if (!plan) return null
-  const inserted = insertTierGoalAtDate(plan, date, tier, label, done)
+  const inserted = insertTierGoalAtDate(plan, date, tier, label, done, timeStart, timeEnd)
   if (!inserted) return null
   nextPlans = nextPlans.map((p) => (p.id === inserted.id ? inserted : p))
   return { plans: nextPlans, miscTodos: nextMisc }

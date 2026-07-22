@@ -1268,6 +1268,174 @@ html, body, #root {
   color: var(--goal-ink);
 }
 
+.goal-app .goal-chk-time {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--goal-accent-deep, #3a9d62);
+  letter-spacing: 0.02em;
+}
+
+/* ── 할 일 시간 설정 (GoalTaskTimeSheet) ── */
+.goal-app .goal-time-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(15, 18, 22, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.goal-app .goal-time-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: min(92vh, 720px);
+  overflow-y: auto;
+  background: var(--goal-surface, #fff);
+  border-radius: 20px 20px 0 0;
+  padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.goal-app .goal-time-title {
+  margin: 0;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--goal-ink);
+}
+
+.goal-app .goal-time-task {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--goal-muted);
+  line-height: 1.4;
+}
+
+.goal-app .goal-time-preview {
+  margin: 10px 0 14px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--goal-accent-deep, #3a9d62);
+}
+
+.goal-app .goal-time-preview.muted {
+  font-weight: 400;
+  color: var(--goal-muted);
+}
+
+.goal-app .goal-time-field-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.goal-app .goal-time-field-tabs button {
+  border: 1px solid var(--goal-line);
+  border-radius: 12px;
+  padding: 10px 8px;
+  font-size: 12px;
+  background: var(--goal-surface-2, #f4f6f8);
+  color: var(--goal-ink);
+}
+
+.goal-app .goal-time-field-tabs button.on {
+  border-color: var(--goal-accent);
+  background: var(--goal-accent-soft);
+  color: var(--goal-accent-deep);
+  font-weight: 600;
+}
+
+.goal-app .goal-time-ampm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.goal-app .goal-time-ampm button {
+  border: 1px solid var(--goal-line);
+  border-radius: 999px;
+  padding: 11px;
+  font-size: 14px;
+  background: var(--goal-surface-2, #f4f6f8);
+}
+
+.goal-app .goal-time-ampm button.on {
+  background: var(--goal-ink);
+  color: #fff;
+  border-color: var(--goal-ink);
+}
+
+.goal-app .goal-time-section {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.goal-app .goal-time-section-label {
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--goal-muted);
+}
+
+.goal-app .goal-time-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.goal-app .goal-time-chip {
+  aspect-ratio: 1;
+  border-radius: 999px;
+  border: 1px solid var(--goal-line);
+  background: var(--goal-surface-2, #f4f6f8);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-app .goal-time-chip.on {
+  background: var(--goal-ink);
+  color: #fff;
+  border-color: var(--goal-ink);
+}
+
+.goal-app .goal-time-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.goal-app .goal-time-clear,
+.goal-app .goal-time-done {
+  border-radius: 14px;
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.goal-app .goal-time-clear {
+  border: 1px solid var(--goal-line);
+  background: var(--goal-surface-2, #f4f6f8);
+  color: var(--goal-muted);
+}
+
+.goal-app .goal-time-done {
+  border: none;
+  background: var(--goal-accent);
+  color: #fff;
+}
+
 .goal-app .goal-chk-remove {
   font-size: 17px;
   color: var(--goal-muted-light);

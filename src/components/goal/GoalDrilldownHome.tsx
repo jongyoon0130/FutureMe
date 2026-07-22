@@ -6,8 +6,10 @@ import {
   removeMiscTodo,
   toggleMiscTodo,
   updateMiscTodoLabel,
+  updateMiscTodoTime,
   type MiscTodoItem,
 } from '../../lib/goalMiscTodos'
+import { compareTaskTime, formatTaskTimeRange } from '../../lib/goalTaskTime'
 import type { SelfProfile } from '../../types/self'
 import type { GoalPlan } from '../../types/goalPlan'
 import { GoalDayClose } from './GoalDayClose'
@@ -24,6 +26,7 @@ import {
   resolveHorizon,
   resolveDateSlots,
   weeksForMonth,
+  type AggregatedItem,
 } from '../../lib/goalHierarchyEngine'
 import { rootScreenTier } from '../../lib/goalHorizon'
 import {
@@ -36,6 +39,7 @@ import {
   removeAggregatedItem,
   toggleAggregatedItem,
   updateAggregatedItemLabel,
+  updateAggregatedItemTime,
   toggleDayItem,
   toggleMonthNodeItem,
   toggleWeekItemH,
@@ -52,6 +56,7 @@ import { GoalHierarchyTree } from './GoalHierarchyTree'
 import { GoalHomeTierAddRow, isSameCalendarDay } from './GoalHomeTierAddRow'
 import { GoalMotivationCard, GoalMotivationForm } from './GoalMotivationForm'
 import { GoalRoutineDashboard } from './GoalRoutineDashboard'
+import { GoalTaskTimeSheet } from './GoalTaskTimeSheet'
 import { GoalSwipeDelete } from './GoalSwipeDelete'
 import { EditableChecklist } from './GoalEditableChecklist'
 import {
@@ -65,6 +70,29 @@ import {
 } from './GoalShell'
 
 type Screen = 'home' | 'root' | 'month' | 'week' | 'day' | 'edit' | 'motivation'
+
+type TimeEditTarget = {
+  planId: string
+  itemId: string
+  label: string
+  timeStart?: string
+  timeEnd?: string
+}
+
+function sortDailyByTime(list: AggregatedItem[]): AggregatedItem[] {
+  return [...list].sort((a, b) => {
+    const aHas = !!(a.timeStart || a.timeEnd)
+    const bHas = !!(b.timeStart || b.timeEnd)
+    if (aHas && !bHas) return -1
+    if (!aHas && bHas) return 1
+    if (aHas && bHas) {
+      const byStart = compareTaskTime(a.timeStart, b.timeStart)
+      if (byStart !== 0) return byStart
+      return compareTaskTime(a.timeEnd, b.timeEnd)
+    }
+    return 0
+  })
+}
 
 interface Props {
   plans: GoalPlan[]
@@ -96,6 +124,7 @@ export function GoalDrilldownHome({
   const [calMonth, setCalMonth] = useState<number>(() => new Date().getMonth())
   const [addingTier, setAddingTier] = useState<'daily' | 'weekly' | 'monthly' | null>(null)
   const [miscTodos, setMiscTodos] = useState<MiscTodoItem[]>(() => loadMiscTodos(profile.id))
+  const [timeEdit, setTimeEdit] = useState<TimeEditTarget | null>(null)
 
   useEffect(() => {
     const onSynced = () => setMiscTodos(loadMiscTodos(profile.id))
@@ -135,7 +164,7 @@ export function GoalDrilldownHome({
     return [
       {
         key: 'daily' as const,
-        list: [...aggregated.daily, ...miscAgg.daily],
+        list: sortDailyByTime([...aggregated.daily, ...miscAgg.daily]),
         title: isTodaySelected ? '오늘 할 일' : `${selectedDate.getMonth() + 1}/${selectedDate.getDate()} 할 일`,
         badge: 'd' as const,
         placeholder: '할 일 입력',
@@ -209,6 +238,27 @@ export function GoalDrilldownHome({
     if (!moved) return
     persistAll(moved.plans)
     setMiscTodos(moved.miscTodos)
+  }
+
+  const handleTimeSave = (next: { timeStart?: string; timeEnd?: string }) => {
+    if (!timeEdit) return
+    if (timeEdit.planId === MISC_PLAN_ID) {
+      setMiscTodos(updateMiscTodoTime(profile.id, miscTodos, timeEdit.itemId, next.timeStart, next.timeEnd))
+    } else {
+      const u = updateAggregatedItemTime(plans, timeEdit.planId, timeEdit.itemId, 'daily', next.timeStart, next.timeEnd)
+      if (u) persist(u)
+    }
+    setTimeEdit(null)
+  }
+
+  const openTimeEdit = (it: AggregatedItem) => {
+    setTimeEdit({
+      planId: it.planId,
+      itemId: it.id,
+      label: it.label,
+      timeStart: it.timeStart,
+      timeEnd: it.timeEnd,
+    })
   }
 
   const pop = () => {
@@ -382,6 +432,8 @@ export function GoalDrilldownHome({
                 done={it.done}
                 goalName={it.planTitle}
                 text={it.label}
+                timeRange={key === 'daily' ? formatTaskTimeRange(it.timeStart, it.timeEnd) : null}
+                drillLabel={key === 'daily' ? '시간 설정' : '상세 보기'}
                 categoryOptions={homeCategoryOptionsForTier(eligiblePlans, key)}
                 categoryId={it.planId}
                 onCategoryChange={(targetPlanId) => handleCategoryChange(it, key, targetPlanId)}
@@ -410,7 +462,13 @@ export function GoalDrilldownHome({
                   const u = removeAggregatedItem(plans, it.planId, it.id, key)
                   if (u) persist(u)
                 }}
-                onDrill={it.planId === MISC_PLAN_ID ? undefined : () => openTierFromHome(it.planId, key)}
+                onDrill={
+                  key === 'daily'
+                    ? () => openTimeEdit(it)
+                    : it.planId === MISC_PLAN_ID
+                      ? undefined
+                      : () => openTierFromHome(it.planId, key)
+                }
               />
             ))}
           </section>
@@ -601,5 +659,18 @@ export function GoalDrilldownHome({
 
   const activeScreen = screens[screen] != null ? screen : 'home'
 
-  return <GoalStack active={activeScreen} stack={stack} screens={screens} />
+  return (
+    <>
+      <GoalStack active={activeScreen} stack={stack} screens={screens} />
+      {timeEdit ? (
+        <GoalTaskTimeSheet
+          taskLabel={timeEdit.label}
+          timeStart={timeEdit.timeStart}
+          timeEnd={timeEdit.timeEnd}
+          onSave={handleTimeSave}
+          onClose={() => setTimeEdit(null)}
+        />
+      ) : null}
+    </>
+  )
 }

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Future Me">
+  <!-- 홈 화면 아이콘 원본. 모서리는 iOS·안드로이드가 알아서 깎으므로 꽉 채운 사각형이다.
+       여기서 public/icons/*.png 를 만든다 (README 참고). -->
+  <rect width="64" height="64" fill="#141414"/>
+  <g transform="translate(32,32) scale(0.72) translate(-32,-32)">
+    <rect x="14" y="16" width="5.5" height="32" rx="2.75" fill="#C8FF00"/>
+    <rect x="23.5" y="16" width="5.5" height="32" rx="2.75" fill="#C8FF00" opacity="0.92"/>
+    <path d="M 33 32 L 50 17 L 50 47 Z" fill="#C8FF00"/>
+  </g>
+</svg>

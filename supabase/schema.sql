@@ -90,3 +90,52 @@ create policy "push subscriptions own" on public.futureme_push_subscriptions
 -- 2단계 크론이 "켜져 있는 구독"만 사용자별로 훑는다
 create index if not exists futureme_push_subscriptions_user
   on public.futureme_push_subscriptions (user_id) where enabled;
+
+-- ---------------------------------------------------------------------------
+-- 알림 단계 2-b — 알림 예약표 + 보낸 기록
+--
+-- 왜 예약표(futureme_reminders)를 따로 두나:
+--   "오늘 이 시각의 할 일"을 찾는 로직(aggregateForDate)은 복잡하다. 서버에서 다시
+--   짜면 앱과 어긋난다. 그래서 앱이 검증된 로직으로 앞으로 며칠치를 **평평하게 펼쳐**
+--   여기 저장하고, 크론은 "지금 시각(사용자 타임존) == fire_time?"만 단순 비교한다.
+--   (앱 쪽 생성 로직: src/lib/notifyReminders.ts)
+-- ---------------------------------------------------------------------------
+create table if not exists public.futureme_reminders (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  fire_date date not null,          -- 사용자 로컬 날짜
+  fire_time text not null,          -- 사용자 로컬 HH:mm
+  kind text not null check (kind in ('start', 'end')),
+  item_id text not null,
+  label text not null,
+  goal_title text not null default '',
+  updated_at bigint not null,
+  primary key (user_id, fire_date, item_id, kind)
+);
+
+alter table public.futureme_reminders enable row level security;
+
+drop policy if exists "reminders own" on public.futureme_reminders;
+create policy "reminders own" on public.futureme_reminders
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- 크론이 "이 시각에 울릴 예약"을 빠르게 찾도록
+create index if not exists futureme_reminders_fire
+  on public.futureme_reminders (fire_date, fire_time);
+
+-- 보낸 기록 — 크론이 매분 돌기 때문에 같은 알림을 두 번 쏘지 않게 한다.
+-- insert가 성공할 때만 발송하면, 크론이 겹쳐 돌거나 재시도해도 한 번만 간다 (§4-5).
+create table if not exists public.futureme_push_sent (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  fire_date date not null,
+  item_id text not null,
+  kind text not null,
+  sent_at bigint not null,
+  primary key (user_id, fire_date, item_id, kind)
+);
+
+alter table public.futureme_push_sent enable row level security;
+
+-- 사용자는 자기 기록만 본다. 실제 쓰기는 크론(서버 권한)이 한다
+drop policy if exists "push sent own" on public.futureme_push_sent;
+create policy "push sent own" on public.futureme_push_sent
+  for select using (auth.uid() = user_id);

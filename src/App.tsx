@@ -28,6 +28,7 @@ import {
   loadModel,
   type ProfileSummary,
 } from './lib/storage'
+import { clearPrimaryProfileId, getPrimaryProfileId, setPrimaryProfileId } from './lib/primaryProfile'
 
 type Screen = 'list' | 'onboarding' | 'chat'
 
@@ -75,6 +76,7 @@ export default function App() {
   const openProfile = (id: string) => {
     const p = loadProfileById(id)
     if (!p) return
+    setPrimaryProfileId(id)
     setActiveProfileId(id)
     setProfile(p)
     setScreen('chat')
@@ -86,6 +88,7 @@ export default function App() {
       id: p.id || crypto.randomUUID(),
     }
     saveProfileRecord(saved)
+    setPrimaryProfileId(saved.id)
     refreshList()
     setActiveProfileId(saved.id)
     setProfile(saved)
@@ -136,6 +139,7 @@ export default function App() {
 
   const handleDeleteProfile = async (id: string) => {
     await deleteProfileRecord(id)
+    if (getPrimaryProfileId() === id) clearPrimaryProfileId()
     if (activeProfileId === id) {
       setActiveProfileId(null)
       setProfile(null)
@@ -221,6 +225,7 @@ export default function App() {
               summaries={summaries}
               onSelect={openProfile}
               onCreateNew={startOnboarding}
+              primaryId={getPrimaryProfileId()}
               onRestoreBackup={handleRestoreBackup}
               onDelete={handleDeleteProfile}
             />
@@ -228,12 +233,12 @@ export default function App() {
           home={
             <HomeScreen
               onTellFuture={(prompt) => {
-                // 하루 마감 → 미래의 나에게 이어 말하기: 첫 프로필의 채팅을 프리필로 연다
-                const first = loadProfileSummaries()[0]
+                // 하루 마감 → 미래의 나에게 이어 말하기: 지금의 "나"에게 이어 말한다
+                const primaryId = getPrimaryProfileId()
                 setActiveTab('chat')
-                if (!first) return
+                if (!primaryId) return
                 setPendingChatPrompt(prompt)
-                openProfile(first.id)
+                openProfile(primaryId)
               }}
             />
           }

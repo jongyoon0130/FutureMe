@@ -8,7 +8,8 @@ import {
   type PersonaFacetId,
   type PersonaFieldSpec,
 } from '../../lib/personaModel'
-import { loadProfileById, loadProfileSummaries, saveProfileRecord } from '../../lib/storage'
+import { loadProfileById, saveProfileRecord } from '../../lib/storage'
+import { getPrimaryProfileId } from '../../lib/primaryProfile'
 import { getGoalAppOwnerId } from '../../lib/goalAppOwner'
 import { dayCloseStreak, loadDayCloses } from '../../lib/dayClose'
 import { achievedPlans, activeGoalsLite, readGoalPlansLite, totalDoneCount } from '../../lib/goalPlanBridge'
@@ -30,9 +31,8 @@ function clip(v: string, max: number): string {
 }
 
 export function ProfileScreen({ onOpenChat, onOpenHome, onCreate, refreshKey }: Props) {
-  // 여러 프로필 중 가장 최근 것을 "나"로 보여준다 (v1 — 전환기는 이후)
-  const summaries = loadProfileSummaries()
-  const primaryId = summaries[0]?.id ?? null
+  // 채팅·홈 탭과 같은 사람을 본다 — "미래의 나는 한 명" (primaryProfile.ts)
+  const primaryId = getPrimaryProfileId()
   const [profile, setProfile] = useState<SelfProfile | null>(() =>
     primaryId ? loadProfileById(primaryId) : null,
   )

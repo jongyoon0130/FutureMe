@@ -11,9 +11,18 @@ interface Props {
   onCreateNew: () => void
   onRestoreBackup: (file: File) => void | Promise<void>
   onDelete: (id: string) => void | Promise<void>
+  /** 지금의 "나" — 홈·프로필 탭이 보는 그 사람 */
+  primaryId: string | null
 }
 
-export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreBackup, onDelete }: Props) {
+export function ProfileListScreen({
+  summaries,
+  onSelect,
+  onCreateNew,
+  onRestoreBackup,
+  onDelete,
+  primaryId,
+}: Props) {
   const { configured, user, signOut, uploadLocalData, syncing, lastSync } = useAuth()
   const hasProfiles = summaries.length > 0
   const importRef = useRef<HTMLInputElement>(null)
@@ -126,14 +135,17 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
               )}
             </div>
           )}
-          <button
-            type="button"
-            onClick={onCreateNew}
-            className="goal-nav-btn"
-            title="미래의 나 추가"
-          >
-            +
-          </button>
+          {/* 미래의 나는 한 명 — 아직 하나도 없을 때만 만들 수 있다 (primaryProfile.ts) */}
+          {!hasProfiles && (
+            <button
+              type="button"
+              onClick={onCreateNew}
+              className="goal-nav-btn"
+              title="미래의 나 만들기"
+            >
+              +
+            </button>
+          )}
         </div>
       </header>
 
@@ -172,6 +184,15 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
         </div>
       ) : (
         <>
+          {summaries.length > 1 && (
+            <p className="px-5 pt-2.5 text-[11px] text-muted/70 leading-relaxed">
+              미래의 나는 한 명이에요. 지금 이어지고 있는 건{' '}
+              <strong className="font-medium text-ink/70">
+                {summaries.find((s) => s.id === primaryId)?.name ?? summaries[0].name}
+              </strong>
+              , 아래에서 다른 방을 열면 그쪽으로 옮겨가요.
+            </p>
+          )}
           <p className="px-5 py-2.5 text-[11px] text-muted/80 border-b border-border/50 bg-surface-2/50 flex items-center justify-between">
             <span>채팅방</span>
             <button
@@ -204,7 +225,12 @@ export function ProfileListScreen({ summaries, onSelect, onCreateNew, onRestoreB
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                        <span className="font-medium text-ink truncate">{s.name}</span>
+                        <span className="font-medium text-ink truncate">
+                          {s.name}
+                          {s.id === primaryId && summaries.length > 1 ? (
+                            <span className="ml-1.5 text-[10px] font-normal text-accent align-middle">지금의 나</span>
+                          ) : null}
+                        </span>
                         <span className="text-[11px] text-muted shrink-0">{formatListTime(s.updatedAt)}</span>
                       </div>
                       <p className="text-sm text-muted truncate leading-snug">{s.preview}</p>

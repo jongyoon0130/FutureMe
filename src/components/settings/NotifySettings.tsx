@@ -49,7 +49,7 @@ export function NotifySettings() {
 
   const handleTest = async () => {
     setBusy(true)
-    setMessage('5초 뒤에 알림이 뜰 거야 — 앱을 닫아놓고 기다려봐도 돼.')
+    setMessage('5초 뒤에 알림이 떠. 앱을 열어둔 채로 기다려줘.')
     const result = await showTestNotification(5000)
     setBusy(false)
     if (result.ok) setMessage('알림을 보냈어. 안 떴으면 기기 알림 설정을 확인해줘.')
@@ -65,6 +65,10 @@ export function NotifySettings() {
       <p className="text-[11px] text-muted/70 mb-2 leading-relaxed">
         시간을 적어둔 할 일에 알림을 보내는 기능을 만들고 있어. 먼저 <strong className="font-medium">이 기기에서
         알림이 뜨는지</strong>부터 확인하는 단계야.
+      </p>
+      <p className="text-[11px] text-muted/60 mb-2.5 leading-relaxed">
+        테스트 알림은 <strong className="font-medium">앱을 열어둔 동안에만</strong> 떠. 앱을 닫으면 타이머도 같이
+        멈추거든 — 꺼져 있을 때도 오게 하는 게 다음 단계(서버)야.
       </p>
 
       <div className="space-y-1 mb-2.5">

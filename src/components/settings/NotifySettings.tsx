@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   describeNotifyBlocker,
+  describePushSubscribeResult,
+  pushServiceHost,
   readNotifyEnv,
+  readPushSubscription,
+  readVapidPublicKey,
   requestNotifyPermission,
   showTestNotification,
+  subscribeToPush,
+  unsubscribeFromPush,
   type NotifyEnv,
 } from '../../lib/notify'
 import { Button } from '../ui'
@@ -19,6 +25,10 @@ export function NotifySettings() {
   const [env, setEnv] = useState<NotifyEnv>(() => readNotifyEnv())
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  /** 1-a: 지금 이 기기에 발급된 배송 주소 (없으면 null) */
+  const [endpoint, setEndpoint] = useState<string | null>(null)
+
+  const hasVapidKey = readVapidPublicKey() !== null
 
   const refresh = useCallback(() => setEnv(readNotifyEnv()), [])
 
@@ -31,6 +41,16 @@ export function NotifySettings() {
       document.removeEventListener('visibilitychange', refresh)
     }
   }, [refresh])
+
+  useEffect(() => {
+    let alive = true
+    void readPushSubscription().then((sub) => {
+      if (alive) setEndpoint(sub?.endpoint ?? null)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const blocker = describeNotifyBlocker(env)
   const canTest = env.permission === 'granted' && !blocker
@@ -59,6 +79,23 @@ export function NotifySettings() {
     else setMessage(`실패했어${result.detail ? ` (${result.detail})` : ''}`)
   }
 
+  const handleSubscribe = async () => {
+    setBusy(true)
+    setMessage('주소를 발급받는 중…')
+    const result = await subscribeToPush()
+    setBusy(false)
+    setEndpoint(result.ok ? result.endpoint : null)
+    setMessage(describePushSubscribeResult(result))
+  }
+
+  const handleUnsubscribe = async () => {
+    setBusy(true)
+    const dropped = await unsubscribeFromPush()
+    setBusy(false)
+    setEndpoint(null)
+    setMessage(dropped ? '발급받은 주소를 버렸어. 다시 눌러보면 새로 받아.' : '버릴 주소가 없었어.')
+  }
+
   return (
     <div>
       <p className="text-xs text-muted mb-1">알림 (준비 중 — 지금은 테스트만)</p>
@@ -75,7 +112,12 @@ export function NotifySettings() {
         <CheckLine ok={env.standalone} label="홈 화면에 설치됨" hint={env.isIOS ? '아이폰은 필수' : '선택'} />
         <CheckLine ok={env.permission === 'granted'} label="알림 권한" hint={env.permission} />
         <CheckLine ok={env.supportsServiceWorker} label="알림 수신기(서비스 워커)" />
-        <CheckLine ok={env.supportsPush} label="서버 알림 지원" hint="2단계에서 필요" />
+        <CheckLine ok={env.supportsPush} label="서버 알림 지원" hint="브라우저 기능만 확인" />
+        <CheckLine
+          ok={endpoint !== null}
+          label="푸시 주소 발급됨"
+          hint={endpoint ? pushServiceHost(endpoint) : '아직 안 받음'}
+        />
       </div>
 
       {env.isIOS && !env.standalone ? (
@@ -101,9 +143,36 @@ export function NotifySettings() {
         <Button size="sm" variant="secondary" onClick={handleTest} disabled={busy || !canTest}>
           5초 뒤 테스트 알림
         </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={handleSubscribe}
+          disabled={busy || !canTest || !env.supportsPush || !hasVapidKey}
+        >
+          푸시 주소 발급
+        </Button>
+        {endpoint ? (
+          <Button size="sm" variant="secondary" onClick={handleUnsubscribe} disabled={busy}>
+            주소 버리기
+          </Button>
+        ) : null}
       </div>
 
+      {!hasVapidKey ? (
+        <p className="text-[11px] text-status-warn mt-2 leading-relaxed">
+          VAPID 공개키가 아직 앱에 안 들어가 있어 — 배포 환경변수{' '}
+          <code className="font-mono">VITE_VAPID_PUBLIC_KEY</code>를 설정하면 발급을 시험할 수 있어.
+        </p>
+      ) : null}
+
       {message ? <p className="text-[11px] text-muted mt-2 leading-relaxed">{message}</p> : null}
+
+      {endpoint ? (
+        <p className="text-[10px] text-muted/60 mt-1.5 leading-relaxed break-all font-mono">
+          {endpoint.slice(0, 72)}
+          {endpoint.length > 72 ? '…' : ''}
+        </p>
+      ) : null}
     </div>
   )
 }

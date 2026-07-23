@@ -3,7 +3,7 @@
 > **목적:** "오후 7시에 시작 알림, 오후 9시에 잘 끝났냐는 알림"을 어떻게 만들지 정리한 문서.
 > **상태:** **단계 0 통과, 1-a 통과 (2026-07-23)** — 설치·권한·테스트 알림에 이어
 > **아이폰이 애플로부터 푸시 주소를 실제로 발급받았다.**
-> 구독 저장(1-b)과 서버 발송(2~3단계)은 아직.
+> **1-b도 통과** — 그 주소가 Supabase에 저장돼 있다. 서버 발송(2~3단계)만 남았다.
 > **작성:** 2026-07-22
 
 ---
@@ -209,6 +209,37 @@ https://web.push.apple.com/QFcJ0bVLr6dO0AwF8uW5pLhMOhK5wTo919ClFe4iAePZM…
 
 이제 남은 건 이 주소를 서버가 알게 하는 것(1-b)과, 서버가 시계를 보다가 쏘는 것(2단계)뿐이다.
 
+### ✅ 1-b 통과 (2026-07-23) — 서버에서 행으로 확인
+
+폰에서 "푸시 주소 발급"을 누르니 진단 6줄이 모두 초록이 됐고, **서버 테이블에 실제로 행이
+들어간 것을 SQL로 확인했다.** 화면 문구만 믿지 않고 서버에서 다시 본 결과:
+
+| 항목 | 값 |
+| --- | --- |
+| 행 개수 | 1 (기기 하나 = 주소 하나, 중복 없음) |
+| endpoint | `https://web.push.apple.com/QFcJ0bVLr6dO0…` |
+| timezone | `Asia/Seoul` |
+| enabled | `true` |
+| **p256dh / auth** | **둘 다 있음 — 2단계에서 암호화 발송이 가능하다** |
+| user_agent | `Mozilla/5.0 (iPhone; CPU iPhone OS 18…)` |
+
+**RLS도 확인했다.** 로그인 없이 anon 키만으로 가짜 구독을 넣어보니
+`new row violates row-level security policy` 로 거부됐다. 남의 알림 주소를 등록하거나
+훔쳐볼 수 없다.
+
+**확인용 쿼리** (Supabase → SQL Editor, postgres 역할이라 RLS를 통과한다):
+
+```sql
+select left(endpoint, 40) || '…' as 주소, timezone, enabled,
+       subscription->'keys'->>'p256dh' is not null as p256dh_있음,
+       subscription->'keys'->>'auth'   is not null as auth_있음,
+       to_timestamp(created_at / 1000) at time zone 'Asia/Seoul' as 저장시각
+from public.futureme_push_subscriptions;
+```
+
+> 지웅님도 이제 Supabase 프로젝트 멤버다 (2026-07-23 초대 수락). 대시보드 작업에
+> 종윤님을 거치지 않아도 된다.
+
 <details>
 <summary>구현 내용 (1-a)</summary>
 
@@ -266,7 +297,7 @@ VAPID 공개키를 Vercel에 넣다가 **새 변수를 만드는 대신 기존 `
 | | 내용 | 확인 방법 |
 | --- | --- | --- |
 | ~~**1-a**~~ | `pushManager.subscribe()` 로 **주소 발급만** 시도하고 성공/실패를 화면에 표시 | ✅ **통과** — `web.push.apple.com` 확인 |
-| 1-b | 성공하면 Supabase 테이블(`futureme_push_subscriptions`) 만들고 저장 | — |
+| ~~1-b~~ | 성공하면 Supabase 테이블(`futureme_push_subscriptions`) 만들고 저장 | ✅ **통과** — 서버에서 행 확인 |
 | 2 | 서버 스케줄러 (pg_cron + Edge Function) | 앱 꺼둔 채로 알림 오는지 |
 
 1-a에 VAPID 키 한 쌍이 필요하다(공개키만 앱에 들어간다). 30분이면 만들어 확인할 수 있다.

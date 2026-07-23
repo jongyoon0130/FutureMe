@@ -36,6 +36,41 @@ function json(body: unknown, status = 200) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+/**
+ * 브라우저에 노출돼도 되는 공개 키를 찾는다.
+ *
+ * `SUPABASE_ANON_KEY`는 대시보드에서 **DEPRECATED**로 표시된다. 아직은 주입되지만
+ * 언젠가 사라지면 함수가 통째로 죽는다. 그래서 새 이름(`SUPABASE_PUBLISHABLE_KEYS`)도
+ * 함께 본다. 이쪽은 JSON인데 모양이 확정적이지 않아서 몇 가지 형태를 다 받아준다.
+ */
+function readPublicKey(): string | null {
+  const legacy = Deno.env.get('SUPABASE_ANON_KEY')?.trim()
+  if (legacy) return legacy
+
+  const raw = Deno.env.get('SUPABASE_PUBLISHABLE_KEYS')?.trim()
+  if (!raw) return null
+
+  // 그냥 키 문자열로 들어오는 경우
+  if (raw.startsWith('sb_publishable_')) return raw
+
+  try {
+    const parsed = JSON.parse(raw)
+    const candidates: unknown[] = Array.isArray(parsed) ? parsed : [parsed, ...Object.values(parsed)]
+    for (const item of candidates) {
+      if (typeof item === 'string' && item.startsWith('sb_publishable_')) return item
+      if (item && typeof item === 'object') {
+        for (const v of Object.values(item as Record<string, unknown>)) {
+          if (typeof v === 'string' && v.startsWith('sb_publishable_')) return v
+        }
+      }
+    }
+    console.error('[push-send] PUBLISHABLE_KEYS 모양을 못 알아봄:', raw.slice(0, 80))
+  } catch {
+    console.error('[push-send] PUBLISHABLE_KEYS가 JSON이 아님:', raw.slice(0, 80))
+  }
+  return null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
@@ -54,11 +89,16 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization') ?? ''
   if (!authHeader) return json({ error: 'not_authenticated' }, 401)
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!,
-    { global: { headers: { Authorization: authHeader } } },
-  )
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const publicKey_ = readPublicKey()
+  if (!supabaseUrl || !publicKey_) {
+    console.error('[push-send] SUPABASE_URL 또는 공개 키를 못 찾음')
+    return json({ error: 'supabase_env_missing' }, 500)
+  }
+
+  const supabase = createClient(supabaseUrl, publicKey_, {
+    global: { headers: { Authorization: authHeader } },
+  })
 
   const { data: userData, error: userError } = await supabase.auth.getUser()
   const user = userData?.user

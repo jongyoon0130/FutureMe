@@ -12,14 +12,22 @@ import {
   unsubscribeFromPush,
   type NotifyEnv,
 } from '../../lib/notify'
+import {
+  deletePushSubscription,
+  describePushSaveResult,
+  isPushSubscriptionSaved,
+  savePushSubscription,
+} from '../../lib/pushSubscriptions'
 import { Button } from '../ui'
 
 /**
- * 알림 설정 — 단계 0(관문).
+ * 알림 설정 — 단계 0 · 1-a · 1-b.
  *
- * 여기서 확인하려는 건 딱 하나다: **이 기기에서 알림이 뜨긴 하나.**
- * 서버는 아직 없다. 그래서 "테스트 알림"은 기기가 스스로 띄우는 것이고,
- * 시간 맞춰 오는 진짜 알림은 다음 단계에서 붙는다.
+ * 0   이 기기에서 알림이 뜨긴 하나 (테스트 알림)          ✅ 통과
+ * 1-a 이 기기가 배송 주소를 받을 수 있나 (푸시 주소 발급)  ✅ 통과
+ * 1-b 그 주소를 서버가 알게 하기 (여기서 저장)
+ *
+ * 여전히 **서버가 보내지는 않는다.** 시간 맞춰 오는 진짜 알림은 2단계다.
  */
 export function NotifySettings() {
   const [env, setEnv] = useState<NotifyEnv>(() => readNotifyEnv())
@@ -27,6 +35,8 @@ export function NotifySettings() {
   const [message, setMessage] = useState<string | null>(null)
   /** 1-a: 지금 이 기기에 발급된 배송 주소 (없으면 null) */
   const [endpoint, setEndpoint] = useState<string | null>(null)
+  /** 1-b: 그 주소가 서버에도 저장돼 있나 */
+  const [saved, setSaved] = useState(false)
 
   const hasVapidKey = readVapidPublicKey() !== null
 
@@ -44,8 +54,10 @@ export function NotifySettings() {
 
   useEffect(() => {
     let alive = true
-    void readPushSubscription().then((sub) => {
-      if (alive) setEndpoint(sub?.endpoint ?? null)
+    void readPushSubscription().then(async (sub) => {
+      if (!alive) return
+      setEndpoint(sub?.endpoint ?? null)
+      setSaved(sub ? await isPushSubscriptionSaved(sub.endpoint) : false)
     })
     return () => {
       alive = false
@@ -83,16 +95,34 @@ export function NotifySettings() {
     setBusy(true)
     setMessage('주소를 발급받는 중…')
     const result = await subscribeToPush()
-    setBusy(false)
     setEndpoint(result.ok ? result.endpoint : null)
-    setMessage(describePushSubscribeResult(result))
+
+    if (!result.ok) {
+      setBusy(false)
+      setSaved(false)
+      setMessage(describePushSubscribeResult(result))
+      return
+    }
+
+    // 1-b: 발급에 성공했으면 곧바로 서버에 적어둔다 (서버가 모르면 못 쏜다)
+    setMessage('서버에 저장하는 중…')
+    const sub = await readPushSubscription()
+    const save = sub
+      ? await savePushSubscription(sub)
+      : ({ ok: false, reason: 'failed', detail: '주소를 다시 읽지 못했어' } as const)
+    setBusy(false)
+    setSaved(save.ok)
+    setMessage(`${describePushSubscribeResult(result)}\n${describePushSaveResult(save)}`)
   }
 
   const handleUnsubscribe = async () => {
     setBusy(true)
+    // 서버 기록부터 지운다 — 남겨두면 서버가 죽은 주소로 계속 쏘게 된다
+    if (endpoint) await deletePushSubscription(endpoint)
     const dropped = await unsubscribeFromPush()
     setBusy(false)
     setEndpoint(null)
+    setSaved(false)
     setMessage(dropped ? '발급받은 주소를 버렸어. 다시 눌러보면 새로 받아.' : '버릴 주소가 없었어.')
   }
 
@@ -118,6 +148,7 @@ export function NotifySettings() {
           label="푸시 주소 발급됨"
           hint={endpoint ? pushServiceHost(endpoint) : '아직 안 받음'}
         />
+        <CheckLine ok={saved} label="서버에 저장됨" hint={saved ? '서버가 이 기기를 앎' : '2단계에 필요'} />
       </div>
 
       {env.isIOS && !env.standalone ? (
@@ -165,7 +196,9 @@ export function NotifySettings() {
         </p>
       ) : null}
 
-      {message ? <p className="text-[11px] text-muted mt-2 leading-relaxed">{message}</p> : null}
+      {message ? (
+        <p className="text-[11px] text-muted mt-2 leading-relaxed whitespace-pre-line">{message}</p>
+      ) : null}
 
       {endpoint ? (
         <p className="text-[10px] text-muted/60 mt-1.5 leading-relaxed break-all font-mono">

@@ -18,6 +18,7 @@ import {
   isPushSubscriptionSaved,
   savePushSubscription,
 } from '../../lib/pushSubscriptions'
+import { describePushSendResult, requestServerPush } from '../../lib/pushSend'
 import { Button } from '../ui'
 
 /**
@@ -126,16 +127,26 @@ export function NotifySettings() {
     setMessage(dropped ? '발급받은 주소를 버렸어. 다시 눌러보면 새로 받아.' : '버릴 주소가 없었어.')
   }
 
+  // 2-a: 서버에게 한 발 쏴달라고 부탁한다. 부탁만 하고 앱은 꺼도 된다
+  const handleServerPush = async () => {
+    setBusy(true)
+    setMessage('서버에 부탁하는 중…')
+    const result = await requestServerPush()
+    setBusy(false)
+    setMessage(describePushSendResult(result))
+  }
+
   return (
     <div>
-      <p className="text-xs text-muted mb-1">알림 (준비 중 — 지금은 테스트만)</p>
+      <p className="text-xs text-muted mb-1">알림 (준비 중 — 서버 발송 시험 단계)</p>
       <p className="text-[11px] text-muted/70 mb-2 leading-relaxed">
-        시간을 적어둔 할 일에 알림을 보내는 기능을 만들고 있어. 먼저 <strong className="font-medium">이 기기에서
-        알림이 뜨는지</strong>부터 확인하는 단계야.
+        시간을 적어둔 할 일에 알림을 보내는 기능을 만들고 있어. 이 기기 주소를{' '}
+        <strong className="font-medium">서버가 알고 있는</strong> 데까지 왔고, 지금은{' '}
+        <strong className="font-medium">앱이 꺼져 있어도 오는지</strong>를 확인하는 단계야.
       </p>
       <p className="text-[11px] text-muted/60 mb-2.5 leading-relaxed">
-        테스트 알림은 <strong className="font-medium">앱을 열어둔 동안에만</strong> 떠. 앱을 닫으면 타이머도 같이
-        멈추거든 — 꺼져 있을 때도 오게 하는 게 다음 단계(서버)야.
+        <strong className="font-medium">5초 뒤 테스트 알림</strong>은 앱을 열어둔 동안에만 떠 (타이머가 앱 안에서
+        돌거든). <strong className="font-medium">서버에서 보내보기</strong>는 달라 — 누르고 앱을 완전히 꺼도 와야 해.
       </p>
 
       <div className="space-y-1 mb-2.5">
@@ -182,6 +193,11 @@ export function NotifySettings() {
         >
           푸시 주소 발급
         </Button>
+        {saved ? (
+          <Button size="sm" variant="secondary" onClick={handleServerPush} disabled={busy}>
+            서버에서 보내보기
+          </Button>
+        ) : null}
         {endpoint ? (
           <Button size="sm" variant="secondary" onClick={handleUnsubscribe} disabled={busy}>
             주소 버리기

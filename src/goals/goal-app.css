@@ -1424,11 +1424,15 @@ html, body, #root {
 .goal-app .goal-time-sheet {
   width: 100%;
   max-width: 480px;
-  max-height: min(92vh, 720px);
+  /* dvh는 iOS에서 홈바를 뺀 '실제 보이는 높이'다. vh는 홈바 뒤까지 쳐서
+     시트 바닥(완료 버튼)이 화면 밖으로 밀린다 — 작은 아이폰에서 저장 불가 버그의 원인 */
+  max-height: min(88vh, 720px);
+  max-height: min(88dvh, 720px);
   overflow-y: auto;
   background: var(--goal-surface, #fff);
   border-radius: 20px 20px 0 0;
-  padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  /* 바닥 패딩은 sticky 액션바가 대신 확보한다 (여기 두면 스크롤 끝에 빈 공간만 생김) */
+  padding: 18px 16px 0;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
 }
 
@@ -1545,7 +1549,14 @@ html, body, #root {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  /* 시트 바닥에 딱 붙어 항상 보이게 — 스크롤이 아무리 길어도 '완료'가 화면에 남는다 */
+  position: sticky;
+  bottom: 0;
   margin-top: 8px;
+  padding: 10px 0 calc(12px + env(safe-area-inset-bottom));
+  background: var(--goal-surface, #fff);
+  /* 위 칩들이 액션바 뒤로 스크롤될 때 경계가 보이게 */
+  box-shadow: 0 -8px 12px -8px rgba(0, 0, 0, 0.18);
 }
 
 .goal-app .goal-time-clear,

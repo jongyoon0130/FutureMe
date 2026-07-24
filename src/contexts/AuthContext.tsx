@@ -100,9 +100,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
+    // 탭/앱으로 돌아올 때 다시 당겨온다. 이게 없으면 로그인 순간 한 번만 동기화돼서,
+    // 다른 기기에서 저장한 게 이미 열려 있는 이 기기엔 안 보인다.
+    // (runSync는 5분 스로틀이 걸려 있어 자주 눌러도 서버를 두들기지 않는다)
+    const resyncOnReturn = () => {
+      if (document.visibilityState === 'hidden') return
+      void supabase?.auth.getSession().then(({ data }) => {
+        if (!cancelled && data.session?.user) void runSync(data.session.user.id)
+      })
+    }
+    window.addEventListener('focus', resyncOnReturn)
+    document.addEventListener('visibilitychange', resyncOnReturn)
+
     return () => {
       cancelled = true
       subscription.unsubscribe()
+      window.removeEventListener('focus', resyncOnReturn)
+      document.removeEventListener('visibilitychange', resyncOnReturn)
     }
   }, [configured, runSync])
 

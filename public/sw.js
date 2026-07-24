@@ -22,16 +22,29 @@ self.addEventListener('activate', (event) => {
  * 지금은 받을 서버가 없지만, 형식만 맞춰 미리 넣어둔다.
  */
 self.addEventListener('push', (event) => {
+  // 아이폰(WebKit)은 event.data.json()이 간헐적으로 비어서 오는 사례가 있어
+  // json() → JSON.parse(text()) → 원문 텍스트 순으로 물러가며 최대한 읽어낸다.
   let payload = {}
-  try {
-    payload = event.data ? event.data.json() : {}
-  } catch {
-    payload = { body: event.data ? event.data.text() : '' }
+  let hadData = false
+  if (event.data) {
+    hadData = true
+    try {
+      payload = event.data.json()
+    } catch {
+      try {
+        payload = JSON.parse(event.data.text())
+      } catch {
+        payload = { body: event.data.text() }
+      }
+    }
   }
 
   const title = payload.title || 'Future Me'
+  // hadData=false 면 폰이 payload를 아예 못 받은 것(암호화/전달 문제)이다.
+  // 이때 조용히 빈칸으로 두지 말고 그 사실이 드러나는 본문을 띄운다 — 진단이 된다.
+  const body = payload.body || (hadData ? '' : '알림 내용을 불러오지 못했어')
   const options = {
-    body: payload.body || '',
+    body,
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: payload.tag || undefined,

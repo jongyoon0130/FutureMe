@@ -127,9 +127,10 @@ Deno.serve(async (req) => {
   }
   if (!subs || subs.length === 0) return json({ error: 'no_subscriptions' }, 404)
 
+  // title에 메시지를 실어 아이폰 body-빈칸 문제를 피한다(§push-tick과 동일 이유).
   const payload = JSON.stringify({
-    title: 'Future Me',
-    body: '서버에서 보낸 알림이야. 앱이 꺼져 있어도 도착했어.',
+    title: '서버 알림 테스트 — 앱이 꺼져 있어도 도착했어',
+    body: '이 둘째 줄이 보이면 본문 전달까지 정상이야.',
     url: '/',
     tag: 'futureme-server-test',
   })

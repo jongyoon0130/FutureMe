@@ -108,12 +108,16 @@ Deno.serve(async (req) => {
       })
       if (sentErr) continue // 이 기기엔 이미 보냈음(중복) 또는 오류 → 건너뜀
 
+      // **메시지는 title에 넣는다.** 아이폰은 title은 확실히 띄우지만 body는 payload가
+      // event.data로 안 오면 통째로 사라진다(제목만, 본문 빈칸). 실제 문구를 title에 두면
+      // 그 경우에도 내용이 보이고, title이 'Future Me'로 안 떨어지니 도달 여부 진단도 된다.
+      const goal = (r.goal_title ?? '').trim()
       const payload = JSON.stringify({
-        title: 'Future Me',
-        body:
+        title:
           r.kind === 'start'
             ? `이제 시작할 시간이야 — ${r.label}`
             : `${r.label}, 잘 끝났어? 기록해두자`,
+        body: goal, // 어느 목표의 할 일인지 (렌더되면 둘째 줄로, 안 되면 생략)
         url: '/',
         tag: `futureme-${r.item_id}-${r.kind}`,
       })

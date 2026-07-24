@@ -1413,7 +1413,9 @@ html, body, #root {
 .goal-app .goal-time-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  /* 하단 탭바(.app-bottom-nav, z-index:30)보다 확실히 위. 안 그러면 탭바가 시트
+     바닥의 '완료' 버튼을 덮는다 */
+  z-index: 300;
   background: rgba(15, 18, 22, 0.45);
   display: flex;
   align-items: flex-end;
@@ -1549,11 +1551,13 @@ html, body, #root {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  /* 시트 바닥에 딱 붙어 항상 보이게 — 스크롤이 아무리 길어도 '완료'가 화면에 남는다 */
+  /* 시트 바닥에 딱 붙어 항상 보이게 — 스크롤이 아무리 길어도 '완료'가 화면에 남는다.
+     바닥 padding에 하단 탭바 높이(약 64px)를 더해, 탭바가 백드롭 위로 새어 나와도
+     '완료' 버튼이 그 위에 뜨게 한다 (z-index만으로 안 되는 stacking 상황 대비) */
   position: sticky;
   bottom: 0;
   margin-top: 8px;
-  padding: 10px 0 calc(12px + env(safe-area-inset-bottom));
+  padding: 10px 0 calc(64px + env(safe-area-inset-bottom));
   background: var(--goal-surface, #fff);
   /* 위 칩들이 액션바 뒤로 스크롤될 때 경계가 보이게 */
   box-shadow: 0 -8px 12px -8px rgba(0, 0, 0, 0.18);

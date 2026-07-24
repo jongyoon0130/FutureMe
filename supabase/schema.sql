@@ -124,13 +124,18 @@ create index if not exists futureme_reminders_fire
 
 -- 보낸 기록 — 크론이 매분 돌기 때문에 같은 알림을 두 번 쏘지 않게 한다.
 -- insert가 성공할 때만 발송하면, 크론이 겹쳐 돌거나 재시도해도 한 번만 간다 (§4-5).
+--
+-- 키에 **endpoint(기기)** 가 들어간다. 안 그러면 다기기 사용자에게 첫 기기만 알림이
+-- 간다 — 두 번째 기기가 같은 (user,date,item,kind)로 충돌해 건너뛰어지기 때문.
+-- 기기별로 각각 한 번씩 보내되, 그 기기엔 두 번 안 보내는 게 목표다.
 create table if not exists public.futureme_push_sent (
   user_id uuid not null references auth.users (id) on delete cascade,
+  endpoint text not null,
   fire_date date not null,
   item_id text not null,
   kind text not null,
   sent_at bigint not null,
-  primary key (user_id, fire_date, item_id, kind)
+  primary key (user_id, endpoint, fire_date, item_id, kind)
 );
 
 alter table public.futureme_push_sent enable row level security;

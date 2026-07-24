@@ -94,14 +94,19 @@ Deno.serve(async (req) => {
     for (const r of due) {
       // 중복 방지: 보낸 기록을 먼저 넣어보고, 성공(=처음)일 때만 발송한다.
       // 크론이 겹쳐 돌거나 재시도해도 유니크 키 충돌로 한 번만 통과한다.
+      //
+      // **키에 endpoint(기기)가 들어가야 한다.** 이게 빠지면 이 루프가 기기별로 도는데
+      // 첫 기기가 (사용자,날짜,할일,종류)로 기록을 남기는 순간, 같은 사용자의 다른 기기가
+      // 같은 키로 충돌해 건너뛰어진다 → 다기기 사용자에게 한 대만 알림이 간다.
       const { error: sentErr } = await db.from('futureme_push_sent').insert({
         user_id: sub.user_id,
+        endpoint: sub.endpoint,
         fire_date: now.date,
         item_id: r.item_id,
         kind: r.kind,
         sent_at: Date.now(),
       })
-      if (sentErr) continue // 이미 보냈음(중복) 또는 오류 → 건너뜀
+      if (sentErr) continue // 이 기기엔 이미 보냈음(중복) 또는 오류 → 건너뜀
 
       const payload = JSON.stringify({
         title: 'Future Me',
@@ -122,13 +127,14 @@ Deno.serve(async (req) => {
       } catch (e) {
         const status = (e as { statusCode?: number }).statusCode
         console.error(`[push-tick] 발송 실패(${status ?? '?'}) ${r.item_id}/${r.kind}`, String(e))
-        // 죽은 주소면 구독 삭제. 보낸 기록은 지워서, 주소를 다시 받으면 재발송되게
+        // 죽은 주소면 그 기기 구독만 삭제. 보낸 기록도 그 기기 것만 지워서, 주소를
+        // 다시 받으면 재발송되게 (다른 기기 기록은 건드리지 않는다 — endpoint로 특정)
         if (status === 404 || status === 410) {
           await db.from('futureme_push_subscriptions').delete().eq('endpoint', sub.endpoint)
           await db
             .from('futureme_push_sent')
             .delete()
-            .eq('user_id', sub.user_id)
+            .eq('endpoint', sub.endpoint)
             .eq('fire_date', now.date)
             .eq('item_id', r.item_id)
             .eq('kind', r.kind)

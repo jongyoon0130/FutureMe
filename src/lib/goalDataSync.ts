@@ -11,6 +11,7 @@ import { writeGoalPlanSnapshot } from './goalPlanSnapshot'
 import { loadMiscTodos, type MiscTodoItem } from './goalMiscTodos'
 import { loadRoutines, type MiscRoutine } from './goalRoutines'
 import { isApplyingRemoteGoalData, setApplyingRemoteGoalData } from './goalDataSyncState'
+import { syncRemindersToCloud } from './reminderSync'
 
 const REVISION_KEY = 'futureme-goal-data-revision'
 export const GOAL_DATA_SYNC_EVENT = 'futureme-goal-data-synced'
@@ -163,6 +164,8 @@ export async function pushLocalGoalData(): Promise<void> {
     routines: bundle.routines,
     updatedAt,
   })
+  // 2-b: 할 일을 올린 김에 알림 예약표도 최신화한다 (실패해도 저장은 성공한 채로)
+  await syncRemindersToCloud(bundle.plans, bundle.miscTodos)
 }
 
 export function scheduleGoalDataSync(): void {
@@ -187,26 +190,17 @@ export async function syncGoalDataOnLogin(userId: string): Promise<'uploaded' | 
   }
 
   if (!localHas && remoteHas) {
-    applyLocalGoalDataBundle(remoteRowToBundle(remoteRow))
+    const remote = remoteRowToBundle(remoteRow)
+    applyLocalGoalDataBundle(remote)
+    // 새 기기에서 로그인만 해도 오늘 예약이 서버에 서게 (편집을 기다리지 않고)
+    await syncRemindersToCloud(remote.plans, remote.miscTodos)
     return 'downloaded'
   }
 
   if (localHas && remoteHas) {
     const remote = remoteRowToBundle(remoteRow)
-    if (remote.updatedAt > local.updatedAt) {
-      const merged = mergeGoalDataBundles(local, remote)
-      applyLocalGoalDataBundle(merged)
-      await pushGoalDataToCloud({
-        ownerId: merged.ownerId,
-        plans: merged.plans,
-        miscTodos: merged.miscTodos,
-        routines: merged.routines,
-        updatedAt: merged.updatedAt,
-      })
-      return 'merged'
-    }
     if (local.updatedAt > remote.updatedAt) {
-      await pushLocalGoalData()
+      await pushLocalGoalData() // 예약표 갱신 포함
       return 'merged'
     }
     const merged = mergeGoalDataBundles(local, remote)
@@ -218,6 +212,7 @@ export async function syncGoalDataOnLogin(userId: string): Promise<'uploaded' | 
       routines: merged.routines,
       updatedAt: merged.updatedAt,
     })
+    await syncRemindersToCloud(merged.plans, merged.miscTodos)
     return 'merged'
   }
 

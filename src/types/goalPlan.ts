@@ -94,12 +94,6 @@ export interface PlanCheckItem {
   timeEnd?: string
   /** 이 할 일 알림 끄기 (기본은 켜짐 = undefined). 시간이 있어도 알림을 안 보낸다 */
   notifyOff?: boolean
-  /**
-   * 이 항목을 마지막으로 고친 시각(ms). 기기 간 병합에서 **항목별 최신 우선**을 쓰기 위한 값.
-   * (목표 전체가 아니라 항목 단위로 병합해, 같은 목표 안 여러 편집이 서로 안 묻히게 한다.)
-   * 없으면(옛 데이터) 목표(플랜) 단위 규칙으로 물러난다.
-   */
-  updatedAt?: number
 }
 
 export interface PlanPhase {

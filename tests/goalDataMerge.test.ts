@@ -5,7 +5,6 @@
 import { describe, expect, it } from 'bun:test'
 import { mergeGoalDataBundles, type GoalDataBundle } from '../src/lib/goalDataSync'
 import type { MiscTodoItem } from '../src/lib/goalMiscTodos'
-import type { GoalPlan, PlanCheckItem } from '../src/types/goalPlan'
 
 function misc(id: string, over: Partial<MiscTodoItem> = {}): MiscTodoItem {
   return { id, label: id, done: false, tier: 'daily', periodKey: '2026-07-27', ...over }
@@ -13,34 +12,6 @@ function misc(id: string, over: Partial<MiscTodoItem> = {}): MiscTodoItem {
 
 function bundle(updatedAt: number, miscTodos: MiscTodoItem[]): GoalDataBundle {
   return { ownerId: 'o', plans: [], miscTodos, routines: [], updatedAt }
-}
-
-function item(id: string, over: Partial<PlanCheckItem> = {}): PlanCheckItem {
-  return { id, label: id, done: false, ...over }
-}
-
-/** day-only 목표 하나 (병합이 보는 건 id/updatedAt/hierarchy뿐이라 나머지는 최소로) */
-function dayOnlyPlan(id: string, planUpdatedAt: string, items: PlanCheckItem[]): GoalPlan {
-  return {
-    id,
-    title: id,
-    updatedAt: planUpdatedAt,
-    hierarchy: {
-      horizon: 'day-only',
-      months: [],
-      weeks: [],
-      days: [{ id: 'd1', dateLabel: '', dayOfWeek: '', focus: '', items }],
-      rangeLabel: '',
-      focus: '',
-      startDate: '',
-      deadline: '',
-      currentWeekId: '',
-    },
-  } as unknown as GoalPlan
-}
-
-function planBundle(updatedAt: number, plans: GoalPlan[]): GoalDataBundle {
-  return { ownerId: 'o', plans, miscTodos: [], routines: [], updatedAt }
 }
 
 // 항목 updatedAt이 없는 옛 데이터 — 번들 단위 규칙(preferLocal)으로 물러난다
@@ -102,28 +73,5 @@ describe('mergeGoalDataBundles — 삭제 전파(툼스톤)', () => {
     const x = mergeGoalDataBundles(local, remote).miscTodos.find((t) => t.id === 'X')
     expect(x?.deletedAt).toBeUndefined()
     expect(x?.label).toBe('X부활')
-  })
-})
-
-// 목표 트리 내부 항목 — 같은 목표 안 여러 편집이 통째 병합에 묻히지 않는가
-describe('mergeGoalDataBundles — 목표 트리 항목별 병합', () => {
-  it('같은 목표 안 서로 다른 항목 체크가 둘 다 반영된다', () => {
-    // 폰(local): B를 체크 / 맥(remote): A를 체크. 둘 다 살아야 한다.
-    const local = planBundle(0, [
-      dayOnlyPlan('g1', '2026-07-27T10:05:00', [item('A'), item('B', { done: true, updatedAt: 200 })]),
-    ])
-    const remote = planBundle(0, [
-      dayOnlyPlan('g1', '2026-07-27T10:00:00', [item('A', { done: true, updatedAt: 100 }), item('B')]),
-    ])
-    const items = mergeGoalDataBundles(local, remote).plans[0].hierarchy!.days[0].items
-    expect(items.find((i) => i.id === 'A')?.done).toBe(true) // 맥 체크 반영
-    expect(items.find((i) => i.id === 'B')?.done).toBe(true) // 폰 체크 반영
-  })
-
-  it('같은 항목을 양쪽이 고치면 더 늦게 고친 쪽이 이긴다', () => {
-    const local = planBundle(0, [dayOnlyPlan('g1', '2026-07-27T10:00:00', [item('A', { done: true, updatedAt: 100 })])])
-    const remote = planBundle(0, [dayOnlyPlan('g1', '2026-07-27T10:00:00', [item('A', { done: false, updatedAt: 300 })])])
-    const items = mergeGoalDataBundles(local, remote).plans[0].hierarchy!.days[0].items
-    expect(items.find((i) => i.id === 'A')?.done).toBe(false) // 나중(300)이 이김 → 체크 해제 반영
   })
 })

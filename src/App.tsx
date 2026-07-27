@@ -73,6 +73,33 @@ export default function App() {
     }
   }, [syncing, session, refreshList])
 
+  // 알림을 눌러 들어왔을 때 "오늘 홈"으로 데려간다.
+  //  - 이미 떠 있는 창: 서비스 워커가 보내는 futureme-open 메시지 (sw.js)
+  //  - 콜드 오픈: /?tab=home 으로 열렸을 때 그 탭으로 (열고 나면 URL은 정리)
+  useEffect(() => {
+    const goHome = () => {
+      setScreen('list')
+      changeTab('home')
+    }
+    const onSwMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'futureme-open') goHome()
+    }
+    navigator.serviceWorker?.addEventListener('message', onSwMessage)
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get('tab')
+      if (tab === 'home' || tab === 'chat' || tab === 'profile') {
+        setActiveTab(tab as MainTab)
+        params.delete('tab')
+        const qs = params.toString()
+        window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''))
+      }
+    } catch {
+      /* URL 파싱 실패는 무시 — 알림 흐름의 부수 기능일 뿐 */
+    }
+    return () => navigator.serviceWorker?.removeEventListener('message', onSwMessage)
+  }, [changeTab])
+
   const openProfile = (id: string) => {
     const p = loadProfileById(id)
     if (!p) return

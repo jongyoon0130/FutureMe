@@ -71,6 +71,8 @@ export function deriveReminders(
     const fire_date = dateKey(day)
 
     for (const item of dailyItemsForDate(plans, misc, day)) {
+      // 이 할 일 알림을 꺼뒀으면 예약을 안 만든다 (할 일별 on/off)
+      if (item.notifyOff) continue
       const start = normalizeTime(item.timeStart)
       const end = normalizeTime(item.timeEnd)
       const base = { fire_date, item_id: item.id, label: item.label, goal_title: item.planTitle }

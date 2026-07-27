@@ -12,14 +12,17 @@ interface Props {
   taskLabel: string
   timeStart?: string
   timeEnd?: string
-  onSave: (next: { timeStart?: string; timeEnd?: string }) => void
+  notifyOff?: boolean
+  onSave: (next: { timeStart?: string; timeEnd?: string; notifyOff?: boolean }) => void
   onClose: () => void
 }
 
-export function GoalTaskTimeSheet({ taskLabel, timeStart, timeEnd, onSave, onClose }: Props) {
+export function GoalTaskTimeSheet({ taskLabel, timeStart, timeEnd, notifyOff, onSave, onClose }: Props) {
   const [field, setField] = useState<TaskTimeField>('start')
   const [start, setStart] = useState<string | undefined>(() => timeStart)
   const [end, setEnd] = useState<string | undefined>(() => timeEnd)
+  /** 이 할 일 알림 받기 (기본 켜짐). 시간이 있을 때만 의미가 있다 */
+  const [notifyOn, setNotifyOn] = useState<boolean>(() => !notifyOff)
 
   const active = field === 'start' ? start : end
   const parsed = parseTaskTime24(active ?? '09:00')
@@ -46,10 +49,11 @@ export function GoalTaskTimeSheet({ taskLabel, timeStart, timeEnd, onSave, onClo
   }
 
   const handleDone = () => {
-    onSave({ timeStart: start, timeEnd: end })
+    onSave({ timeStart: start, timeEnd: end, notifyOff: notifyOn ? undefined : true })
   }
 
   const preview = formatTaskTimeRange(start, end)
+  const hasTime = !!(start || end)
 
   return (
     <div className="goal-time-backdrop" onClick={onClose} role="presentation">
@@ -140,6 +144,20 @@ export function GoalTaskTimeSheet({ taskLabel, timeStart, timeEnd, onSave, onClo
             ))}
           </div>
         </div>
+
+        {hasTime ? (
+          <div className="goal-time-section">
+            <span className="goal-time-section-label">알림</span>
+            <div className="goal-time-ampm" role="group" aria-label="이 할 일 알림">
+              <button type="button" className={notifyOn ? 'on' : ''} onClick={() => setNotifyOn(true)}>
+                받기
+              </button>
+              <button type="button" className={!notifyOn ? 'on' : ''} onClick={() => setNotifyOn(false)}>
+                안 받기
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="goal-time-actions">
           <button type="button" className="goal-time-clear" onClick={clearField}>

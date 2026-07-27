@@ -216,6 +216,7 @@ function miscAggregatedLite(items: MiscTodoItem[], date: Date): {
       tier,
       timeStart: it.timeStart,
       timeEnd: it.timeEnd,
+      notifyOff: it.notifyOff,
     }))
 
   return {

@@ -20,6 +20,11 @@ export interface MiscTodoItem {
   notifyOff?: boolean
   /** 반복 일정에서 생긴 행이면 그 루틴 id (goalRoutines.ts) */
   routineId?: string
+  /**
+   * 이 항목을 마지막으로 고친 시각(ms). 기기 간 병합에서 **항목별 최신 우선**을 쓰기 위한 값.
+   * 없으면(옛 데이터) 번들 단위 규칙으로 물러난다. 항목을 만들거나 고칠 때마다 갱신한다.
+   */
+  updatedAt?: number
 }
 
 function storageKey(profileId: string): string {
@@ -90,6 +95,7 @@ export function insertMiscTodo(
     done,
     tier,
     periodKey: periodKeyForTier(tier, date),
+    updatedAt: Date.now(),
   }
   if (timeStart?.trim()) row.timeStart = timeStart.trim()
   if (timeEnd?.trim()) row.timeEnd = timeEnd.trim()
@@ -100,7 +106,7 @@ export function insertMiscTodo(
 }
 
 export function toggleMiscTodo(profileId: string, items: MiscTodoItem[], itemId: string): MiscTodoItem[] {
-  const next = items.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it))
+  const next = items.map((it) => (it.id === itemId ? { ...it, done: !it.done, updatedAt: Date.now() } : it))
   saveMiscTodos(profileId, next)
   return next
 }
@@ -129,7 +135,7 @@ export function updateMiscTodoLabel(
   itemId: string,
   label: string,
 ): MiscTodoItem[] {
-  const next = items.map((it) => (it.id === itemId ? { ...it, label } : it))
+  const next = items.map((it) => (it.id === itemId ? { ...it, label, updatedAt: Date.now() } : it))
   saveMiscTodos(profileId, next)
   return next
 }
@@ -151,6 +157,7 @@ export function updateMiscTodoTime(
     else delete merged.timeEnd
     if (notifyOff) merged.notifyOff = true
     else delete merged.notifyOff
+    merged.updatedAt = Date.now()
     return merged
   })
   saveMiscTodos(profileId, next)

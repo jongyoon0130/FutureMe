@@ -109,6 +109,20 @@ function mergePlans(local: GoalPlan[], remote: GoalPlan[]): GoalPlan[] {
   return [...byId.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
+/**
+ * 같은 id의 두 항목 중 최신을 고른다. **항목별 updatedAt이 있으면 그걸로**(체크·시간 편집이
+ * 방향과 무관하게 정확히 반영된다). 한쪽에만 updatedAt이 있으면 그쪽이 "고쳐진 것"이므로 이긴다.
+ * 둘 다 없으면(옛 데이터) 번들 단위 규칙(preferLocal)으로 물러난다.
+ */
+function pickNewerTodo(local: MiscTodoItem, remote: MiscTodoItem, preferLocal: boolean): MiscTodoItem {
+  const lt = local.updatedAt
+  const rt = remote.updatedAt
+  if (lt != null && rt != null) return lt >= rt ? local : remote
+  if (lt != null) return local
+  if (rt != null) return remote
+  return preferLocal ? local : remote
+}
+
 function mergeMiscTodos(
   local: MiscTodoItem[],
   remote: MiscTodoItem[],
@@ -120,7 +134,7 @@ function mergeMiscTodos(
   for (const item of remote) byId.set(item.id, item)
   for (const item of local) {
     const existing = byId.get(item.id)
-    if (!existing || preferLocal) byId.set(item.id, item)
+    byId.set(item.id, existing ? pickNewerTodo(item, existing, preferLocal) : item)
   }
   return [...byId.values()]
 }
@@ -164,45 +178,23 @@ export function remoteRowToBundle(row: RemoteGoalDataRow): GoalDataBundle {
   }
 }
 
-/**
- * 올리기 전 병합 — **이 기기의 편집은 무조건 지키고, 다른 기기가 새로 추가한 것만 흡수한다.**
- *
- * 왜 타임스탬프 최신 우선(mergeGoalDataBundles)을 안 쓰나:
- *   그건 번들 단위 updatedAt으로 승자를 정하는데, 폰↔맥 시계가 조금만 어긋나도
- *   방금 이 기기에서 넣은 편집(예: 할 일 시간)이 "원격이 더 최신"으로 판정돼 덮어써진다.
- *   실제로 폰에서 시간을 넣으면 바로 사라지는 버그가 이거였다.
- *
- * 그래서 푸시 경로에서는 **같은 id는 항상 로컬(이 기기)** 을 쓰고, **로컬에 없는 원격 id만**
- * 덧붙인다. 이러면:
- *   - 이 기기의 방금 편집은 절대 안 잃는다 (같은 id는 로컬 승).
- *   - 다른 기기가 새로 추가한 할 일은 안 지운다 (원격-only는 흡수) → 예약도 안 사라진다.
- * 같은 id의 "다른 기기 최신 편집"은 그 기기가 자기 화면 기준으로 다시 올리며 수렴한다.
- */
-export function absorbRemoteOnly<T extends { id: string }>(local: T[], remote: T[]): T[] {
-  const localIds = new Set(local.map((x) => x.id))
-  const extra = remote.filter((x) => !localIds.has(x.id))
-  return extra.length ? [...local, ...extra] : local // 덧붙일 게 없으면 원본 그대로(참조 유지)
-}
-
 export async function pushLocalGoalData(): Promise<void> {
   if (!isCloudSyncAvailable()) return
   const local = loadLocalGoalDataBundle()
 
+  // 올리기 전에 원격과 병합한다. 병합은 **항목별 최신 우선**(mergeMiscTodos가 항목 updatedAt을
+  // 본다)이라, 이 기기의 방금 편집은 지키면서 다른 기기가 고친 항목도 흡수한다.
+  // (예전엔 여기서 "같은 id는 무조건 로컬"로 했다가, 다른 기기의 체크·시간 편집을 덮어썼다.)
   let bundle = local
   const userId = getActiveSyncUser()
   if (userId) {
     try {
       const remoteRow = await fetchRemoteGoalData(userId)
       if (remoteRow) {
-        const remote = remoteRowToBundle(remoteRow)
-        const plans = absorbRemoteOnly(local.plans, remote.plans)
-        const miscTodos = absorbRemoteOnly(local.miscTodos, remote.miscTodos)
-        const routines = absorbRemoteOnly(local.routines, remote.routines)
-        // 흡수한 게 있을 때만 로컬에 반영(불필요한 리렌더·깜빡임 방지)
-        if (plans !== local.plans || miscTodos !== local.miscTodos || routines !== local.routines) {
-          bundle = { ...local, plans, miscTodos, routines }
-          applyLocalGoalDataBundle(bundle)
-        }
+        const merged = mergeGoalDataBundles(local, remoteRowToBundle(remoteRow))
+        // 병합 결과가 로컬과 다를 때만 화면에 반영(불필요한 리렌더·깜빡임 방지)
+        if (serializeGoalData(merged) !== serializeGoalData(local)) applyLocalGoalDataBundle(merged)
+        bundle = merged
       }
     } catch {
       // 원격 조회 실패는 무시하고 로컬로 올린다 — 저장이 막히는 것보단 낫다

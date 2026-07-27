@@ -11,6 +11,8 @@ import type { Session, User } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { setActiveSyncUser } from '../lib/cloudSync'
 import { syncOnLogin, uploadLocalWithConfirm, type SyncResult } from '../lib/syncOrchestrator'
+import { pullRemoteGoalDataOnce } from '../lib/goalDataSync'
+import { startGoalDataRealtime, stopGoalDataRealtime } from '../lib/goalDataRealtime'
 
 type AuthContextValue = {
   configured: boolean
@@ -85,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       if (data.session?.user) {
         void runSync(data.session.user.id) // 5분 이내 재방문·탭 복귀 시 스킵
+        startGoalDataRealtime(data.session.user.id) // 다른 기기 변경을 실시간으로 받는다
       }
     })
 
@@ -93,18 +96,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       setSession(nextSession)
       if (event === 'SIGNED_IN' && nextSession?.user) {
+        startGoalDataRealtime(nextSession.user.id)
         await runSync(nextSession.user.id, { force: true })
       } else if (!nextSession) {
+        stopGoalDataRealtime()
         setActiveSyncUser(null)
         setLastSync(null)
       }
     })
 
-    // 탭/앱으로 돌아올 때 다시 당겨온다. 이게 없으면 로그인 순간 한 번만 동기화돼서,
-    // 다른 기기에서 저장한 게 이미 열려 있는 이 기기엔 안 보인다.
-    // (runSync는 5분 스로틀이 걸려 있어 자주 눌러도 서버를 두들기지 않는다)
+    // 탭/앱으로 돌아올 때 놓친 변경을 따라잡는다. 실시간 소켓은 백그라운드에서 잠들 수
+    // 있으므로(특히 아이폰 홈 화면 앱), 돌아오는 순간 목표 데이터를 한 번 당겨 빈틈을 메운다.
+    // 이건 5분 스로틀이 걸린 전체 동기화와 별개로, 가벼운 목표 데이터 당김이라 매번 돈다.
     const resyncOnReturn = () => {
       if (document.visibilityState === 'hidden') return
+      void pullRemoteGoalDataOnce()
       void supabase?.auth.getSession().then(({ data }) => {
         if (!cancelled && data.session?.user) void runSync(data.session.user.id)
       })
@@ -115,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
       subscription.unsubscribe()
+      stopGoalDataRealtime()
       window.removeEventListener('focus', resyncOnReturn)
       document.removeEventListener('visibilitychange', resyncOnReturn)
     }

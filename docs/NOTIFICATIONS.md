@@ -345,7 +345,7 @@ VAPID 공개키를 Vercel에 넣다가 **새 변수를 만드는 대신 기존 `
 | --- | --- | --- |
 | **올리기 전 병합 (덮어쓰기 경쟁 수정)** | 디바운스 푸시가 원격을 안 보고 로컬로 덮어써서, 오래된 기기가 저장하면 다른 기기가 추가한 할 일·예약이 지워졌다. 이제 **올리기 전 원격을 fetch→병합→로컬 반영 후 push** | ✅ `feat/notify-sync-robust`(PR #15) |
 | **↳ 회귀 수정: 방금 넣은 시간이 사라짐** | 위 병합을 타임스탬프 최신 우선(`mergeGoalDataBundles`)으로 했더니, **폰↔맥 시계가 조금만 어긋나도 방금 이 기기에서 넣은 편집이 "원격이 더 최신"으로 판정돼 덮어써졌다**(폰에서 시간 넣자마자 사라짐). 푸시 경로를 **additive 병합(`absorbRemoteOnly`)**으로 교체 — 같은 id는 무조건 로컬(내 편집 보존), 로컬에 없는 원격 id만 흡수 | ✅ 브랜치 `fix/sync-push-preserve-local-edit` (테스트 6개) |
-| **실시간성** | 지금은 로그인·포커스 복귀 시에만 당김(+5분 스로틀). Supabase Realtime 구독으로 "다른 기기 저장 즉시 반영"까지 | ⬜ 검토 (Supabase에서 `futureme_goal_data` Realtime 켜야 함) |
+| **실시간성 (양방향 즉시 반영)** | 로그인·포커스 때만 당기던 걸, **Supabase Realtime 구독**으로 다른 기기 변경을 즉시 받게. 앱을 켜둔 채 가만히 둬도 반영. 에코 방지는 **내용 기반**(시계값 무관 — 회귀 재발 방지). 백그라운드로 소켓이 잠들 수 있어 **돌아올 때 캐치업 당김**(`pullRemoteGoalDataOnce`, 스로틀 없음)을 함께 둠 → Realtime이 꺼져 있어도 "열면 반영"으로 우아하게 강등 | ✅ 브랜치 `feat/notify-realtime-sync` · ⚠️ **Supabase에서 `futureme_goal_data`를 `supabase_realtime` publication에 추가해야 실시간이 실제로 옴** |
 
 ---
 

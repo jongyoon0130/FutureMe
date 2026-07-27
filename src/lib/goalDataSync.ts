@@ -2,6 +2,7 @@ import type { GoalPlan } from '../types/goalPlan'
 import { getGoalAppOwnerId } from './goalAppOwner'
 import {
   fetchRemoteGoalData,
+  getActiveSyncUser,
   isCloudSyncAvailable,
   pushGoalDataToCloud,
   type RemoteGoalDataRow,
@@ -155,7 +156,27 @@ export function remoteRowToBundle(row: RemoteGoalDataRow): GoalDataBundle {
 
 export async function pushLocalGoalData(): Promise<void> {
   if (!isCloudSyncAvailable()) return
-  const bundle = loadLocalGoalDataBundle()
+  const local = loadLocalGoalDataBundle()
+
+  // **올리기 전에 원격과 병합한다.** 안 그러면 이 경로가 원격을 통째로 덮어써서,
+  // 다른 기기가 먼저 올린 할 일이 사라지고 그 할 일에 걸린 알림 예약도 같이 지워진다
+  // (폰+맥을 같이 쓰면 알림이 조용히 안 오게 되는 원인). 병합은 id 기준 + 최신 우선이라
+  // 이 기기의 방금 편집은 지키면서 다른 기기 것만 흡수한다.
+  let bundle = local
+  const userId = getActiveSyncUser()
+  if (userId) {
+    try {
+      const remoteRow = await fetchRemoteGoalData(userId)
+      if (remoteRow) {
+        const merged = mergeGoalDataBundles(local, remoteRowToBundle(remoteRow))
+        applyLocalGoalDataBundle(merged) // 다른 기기 변경을 이 기기 화면에도 반영
+        bundle = merged
+      }
+    } catch {
+      // 원격 조회 실패는 무시하고 로컬로 올린다 — 저장이 막히는 것보단 낫다
+    }
+  }
+
   const updatedAt = markGoalDataRevision()
   await pushGoalDataToCloud({
     ownerId: bundle.ownerId,

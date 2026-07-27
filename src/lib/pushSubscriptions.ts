@@ -129,3 +129,31 @@ export async function isPushSubscriptionSaved(endpoint: string): Promise<boolean
   const { data, error } = await supabase.from(TABLE).select('endpoint').eq('endpoint', endpoint).maybeSingle()
   return !error && data !== null
 }
+
+/**
+ * 이 기기 알림이 켜져 있나. 저장돼 있으면 `enabled` 값을, 없으면 null.
+ * (크론은 `enabled = true`인 구독에만 쏜다 — 이 값이 곧 "이 기기 알림 스위치"다)
+ */
+export async function getPushEnabled(endpoint: string): Promise<boolean | null> {
+  if (!supabase || !getActiveSyncUser()) return null
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('enabled')
+    .eq('endpoint', endpoint)
+    .maybeSingle()
+  if (error || !data) return null
+  return data.enabled !== false
+}
+
+/**
+ * 이 기기 알림 스위치 on/off. 주소(구독)는 그대로 두고 `enabled`만 바꾼다.
+ * 끄면 크론이 이 기기를 건너뛴다. 다시 켜면 재발급 없이 바로 온다.
+ */
+export async function setPushEnabled(endpoint: string, enabled: boolean): Promise<boolean> {
+  if (!supabase || !getActiveSyncUser()) return false
+  const { error } = await supabase
+    .from(TABLE)
+    .update({ enabled, updated_at: Date.now() })
+    .eq('endpoint', endpoint)
+  return !error
+}

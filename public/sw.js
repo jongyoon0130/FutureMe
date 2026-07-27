@@ -53,7 +53,12 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
-/** 알림을 누르면 앱을 연다 (이미 열려 있으면 그 창으로) */
+/**
+ * 알림을 누르면 앱을 연다.
+ * - 앱이 안 떠 있으면: 새 창을 target으로 연다 (콜드 오픈 → 앱 기본 탭이 '오늘 홈').
+ * - 이미 떠 있으면: 그 창을 앞으로 가져오고, "오늘 홈으로 가라"고 메시지를 보낸다.
+ *   (이걸 안 하면 사용자가 보던 탭 그대로라, 알림을 눌러도 할 일이 안 보인다)
+ */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const target = (event.notification.data && event.notification.data.url) || '/'
@@ -61,7 +66,10 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {
-        if ('focus' in client) return client.focus()
+        if ('focus' in client) {
+          client.postMessage({ type: 'futureme-open', url: target })
+          return client.focus()
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(target)
       return undefined

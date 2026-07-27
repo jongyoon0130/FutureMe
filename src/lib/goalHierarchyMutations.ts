@@ -6,8 +6,10 @@ function withHierarchy(plan: GoalPlan, fn: (h: GoalHierarchy) => GoalHierarchy):
   return { ...plan, hierarchy: fn(plan.hierarchy) }
 }
 
+// 항목 하나를 바꿀 때마다 updatedAt 도장을 찍는다 — 기기 간 병합이 항목별 최신을 가리는 근거.
+// (done 토글·이름 변경 등 항목 편집이 전부 이 헬퍼를 지난다.)
 function mapItems(items: PlanCheckItem[], itemId: string, fn: (it: PlanCheckItem) => PlanCheckItem): PlanCheckItem[] {
-  return items.map((it) => (it.id === itemId ? fn(it) : it))
+  return items.map((it) => (it.id === itemId ? { ...fn(it), updatedAt: Date.now() } : it))
 }
 
 function newItem(label = ''): PlanCheckItem {
@@ -25,7 +27,7 @@ export function setMonthItemLabel(plan: GoalPlan, monthId: string, itemId: strin
   return withHierarchy(plan, (h) => ({
     ...h,
     months: h.months.map((m) =>
-      m.id !== monthId ? m : { ...m, items: m.items.map((it) => (it.id === itemId ? { ...it, label } : it)) },
+      m.id !== monthId ? m : { ...m, items: mapItems(m.items, itemId, (it) => ({ ...it, label })) },
     ),
   }))
 }
@@ -64,7 +66,7 @@ export function setWeekItemLabel(plan: GoalPlan, weekId: string, itemId: string,
   return withHierarchy(plan, (h) => ({
     ...h,
     weeks: h.weeks.map((w) =>
-      w.id !== weekId ? w : { ...w, items: w.items.map((it) => (it.id === itemId ? { ...it, label } : it)) },
+      w.id !== weekId ? w : { ...w, items: mapItems(w.items, itemId, (it) => ({ ...it, label })) },
     ),
   }))
 }
@@ -114,7 +116,7 @@ export function addDayItem(plan: GoalPlan, weekId: string | null, dayId: string)
 export function setDayItemLabel(plan: GoalPlan, weekId: string | null, dayId: string, itemId: string, label: string): GoalPlan {
   return withHierarchy(plan, (h) => {
     const mapDay = (d: PlanDay): PlanDay =>
-      d.id !== dayId ? d : { ...d, items: d.items.map((it) => (it.id === itemId ? { ...it, label } : it)) }
+      d.id !== dayId ? d : { ...d, items: mapItems(d.items, itemId, (it) => ({ ...it, label })) }
     if (h.horizon === 'day-only') return { ...h, days: h.days.map(mapDay) }
     return {
       ...h,
@@ -147,6 +149,7 @@ export function setDayItemTime(
               else delete next.timeEnd
               if (notifyOff) next.notifyOff = true
               else delete next.notifyOff
+              next.updatedAt = Date.now()
               return next
             }),
           }

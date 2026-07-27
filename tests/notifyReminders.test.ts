@@ -69,6 +69,16 @@ describe('deriveReminders', () => {
     expect(deriveReminders([], [misc({ done: true, timeStart: '19:00' })], JUL25, 1)).toHaveLength(1)
   })
 
+  it('알림을 끈 할 일(notifyOff)은 시간이 있어도 예약을 안 만든다', () => {
+    const rows = deriveReminders(
+      [],
+      [misc({ notifyOff: true, timeStart: '19:00', timeEnd: '20:00' })],
+      JUL25,
+      1,
+    )
+    expect(rows).toHaveLength(0)
+  })
+
   it('다른 날짜(periodKey)의 할 일은 그 날짜 범위에 들어와야 잡힌다', () => {
     const items = [
       misc({ id: 'a', periodKey: '2026-07-25', timeStart: '19:00' }),

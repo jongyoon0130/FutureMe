@@ -16,6 +16,8 @@ export interface MiscTodoItem {
   /** 일간 — 24h HH:mm */
   timeStart?: string
   timeEnd?: string
+  /** 이 할 일 알림 끄기 (기본은 켜짐 = undefined) */
+  notifyOff?: boolean
   /** 반복 일정에서 생긴 행이면 그 루틴 id (goalRoutines.ts) */
   routineId?: string
 }
@@ -138,6 +140,7 @@ export function updateMiscTodoTime(
   itemId: string,
   timeStart?: string,
   timeEnd?: string,
+  notifyOff?: boolean,
 ): MiscTodoItem[] {
   const next = items.map((it) => {
     if (it.id !== itemId) return it
@@ -146,6 +149,8 @@ export function updateMiscTodoTime(
     else delete merged.timeStart
     if (timeEnd?.trim()) merged.timeEnd = timeEnd.trim()
     else delete merged.timeEnd
+    if (notifyOff) merged.notifyOff = true
+    else delete merged.notifyOff
     return merged
   })
   saveMiscTodos(profileId, next)
@@ -164,6 +169,7 @@ function toAggregated(items: MiscTodoItem[]): AggregatedItem[] {
     tier: it.tier,
     timeStart: it.timeStart,
     timeEnd: it.timeEnd,
+    notifyOff: it.notifyOff,
     ...(it.routineId ? { routineId: it.routineId } : {}),
   }))
 }

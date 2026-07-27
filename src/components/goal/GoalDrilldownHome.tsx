@@ -87,6 +87,7 @@ type TimeEditTarget = {
   label: string
   timeStart?: string
   timeEnd?: string
+  notifyOff?: boolean
 }
 
 function sortDailyByTime(list: AggregatedItem[]): AggregatedItem[] {
@@ -265,12 +266,22 @@ export function GoalDrilldownHome({
     setMiscTodos(moved.miscTodos)
   }
 
-  const handleTimeSave = (next: { timeStart?: string; timeEnd?: string }) => {
+  const handleTimeSave = (next: { timeStart?: string; timeEnd?: string; notifyOff?: boolean }) => {
     if (!timeEdit) return
     if (timeEdit.planId === MISC_PLAN_ID) {
-      setMiscTodos(updateMiscTodoTime(profile.id, miscTodos, timeEdit.itemId, next.timeStart, next.timeEnd))
+      setMiscTodos(
+        updateMiscTodoTime(profile.id, miscTodos, timeEdit.itemId, next.timeStart, next.timeEnd, next.notifyOff),
+      )
     } else {
-      const u = updateAggregatedItemTime(plans, timeEdit.planId, timeEdit.itemId, 'daily', next.timeStart, next.timeEnd)
+      const u = updateAggregatedItemTime(
+        plans,
+        timeEdit.planId,
+        timeEdit.itemId,
+        'daily',
+        next.timeStart,
+        next.timeEnd,
+        next.notifyOff,
+      )
       if (u) persist(u)
     }
     setTimeEdit(null)
@@ -283,6 +294,7 @@ export function GoalDrilldownHome({
       label: it.label,
       timeStart: it.timeStart,
       timeEnd: it.timeEnd,
+      notifyOff: it.notifyOff,
     })
   }
 
@@ -727,6 +739,7 @@ export function GoalDrilldownHome({
           taskLabel={timeEdit.label}
           timeStart={timeEdit.timeStart}
           timeEnd={timeEdit.timeEnd}
+          notifyOff={timeEdit.notifyOff}
           onSave={handleTimeSave}
           onClose={() => setTimeEdit(null)}
         />

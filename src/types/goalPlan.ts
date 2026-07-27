@@ -92,6 +92,8 @@ export interface PlanCheckItem {
   /** 일간 할 일 — 24h HH:mm */
   timeStart?: string
   timeEnd?: string
+  /** 이 할 일 알림 끄기 (기본은 켜짐 = undefined). 시간이 있어도 알림을 안 보낸다 */
+  notifyOff?: boolean
 }
 
 export interface PlanPhase {

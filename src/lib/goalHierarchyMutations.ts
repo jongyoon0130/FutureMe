@@ -130,6 +130,7 @@ export function setDayItemTime(
   itemId: string,
   timeStart?: string,
   timeEnd?: string,
+  notifyOff?: boolean,
 ): GoalPlan {
   return withHierarchy(plan, (h) => {
     const mapDay = (d: PlanDay): PlanDay =>
@@ -144,6 +145,8 @@ export function setDayItemTime(
               else delete next.timeStart
               if (timeEnd?.trim()) next.timeEnd = timeEnd.trim()
               else delete next.timeEnd
+              if (notifyOff) next.notifyOff = true
+              else delete next.notifyOff
               return next
             }),
           }
@@ -357,6 +360,7 @@ export function updateAggregatedItemTime(
   tier: 'daily' | 'weekly' | 'monthly',
   timeStart?: string,
   timeEnd?: string,
+  notifyOff?: boolean,
 ): GoalPlan | null {
   if (tier !== 'daily') return null
   const plan = plans.find((p) => p.id === planId)
@@ -365,12 +369,14 @@ export function updateAggregatedItemTime(
 
   if (h.horizon === 'day-only') {
     for (const d of h.days) {
-      if (d.items.some((i) => i.id === itemId)) return setDayItemTime(plan, null, d.id, itemId, timeStart, timeEnd)
+      if (d.items.some((i) => i.id === itemId))
+        return setDayItemTime(plan, null, d.id, itemId, timeStart, timeEnd, notifyOff)
     }
   } else {
     for (const w of h.weeks) {
       for (const d of w.days) {
-        if (d.items.some((i) => i.id === itemId)) return setDayItemTime(plan, w.id, d.id, itemId, timeStart, timeEnd)
+        if (d.items.some((i) => i.id === itemId))
+          return setDayItemTime(plan, w.id, d.id, itemId, timeStart, timeEnd, notifyOff)
       }
     }
   }

@@ -27,6 +27,16 @@ export type GoalDataBundle = {
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 
+// 실시간 반영에서 "내가 방금 올린 변경이 되돌아오는 것(에코)"을 걸러내기 위한 표식.
+// **시계값(updatedAt)에 안 기댄다** — 기기 시계가 어긋나면 남의 변경을 에코로 오인해
+// 놓치거나, 내 것을 남의 것으로 오인해 무한 반영될 수 있다(지난 회귀의 교훈).
+// 대신 내용을 직렬화해 "지금 클라우드에 있다고 아는 내용"과 같으면 건너뛴다.
+let knownCloudContent = ''
+
+function serializeGoalData(b: GoalDataBundle): string {
+  return JSON.stringify([b.plans, b.miscTodos, b.routines])
+}
+
 export function getGoalDataRevision(): number {
   try {
     return Number(localStorage.getItem(REVISION_KEY) || 0)
@@ -207,8 +217,48 @@ export async function pushLocalGoalData(): Promise<void> {
     routines: bundle.routines,
     updatedAt,
   })
+  // 방금 올린 내용을 "클라우드에 있다고 아는 내용"으로 기록 → 이 변경이 실시간으로
+  // 되돌아와도 에코로 걸러진다.
+  knownCloudContent = serializeGoalData(bundle)
   // 2-b: 할 일을 올린 김에 알림 예약표도 최신화한다 (실패해도 저장은 성공한 채로)
   await syncRemindersToCloud(bundle.plans, bundle.miscTodos)
+}
+
+/**
+ * 원격 목표 데이터 한 줄을 이 기기에 반영한다 (실시간 이벤트·캐치업 당김 공용).
+ *
+ * - 에코 방지: 내용이 "지금 클라우드에 있다고 아는 것"과 같으면 아무것도 안 한다.
+ * - 반영: 원격을 로컬과 병합해 로컬에만 있는 항목은 지키면서 다른 기기 변경을 흡수한다.
+ *   (이 기기가 방금 편집 중이 아니면 원격이 이기므로 다른 기기 편집이 바로 보인다.)
+ */
+export function applyRemoteGoalRow(row: RemoteGoalDataRow): void {
+  const remote = remoteRowToBundle(row)
+  const remoteContent = serializeGoalData(remote)
+  if (remoteContent === knownCloudContent) return // 내가 올린 에코 or 이미 반영됨
+
+  const local = loadLocalGoalDataBundle()
+  const merged = mergeGoalDataBundles(local, remote)
+  knownCloudContent = remoteContent // 이 원격 상태는 봤다고 기록 (반복 이벤트 무시)
+
+  // 병합 결과가 로컬과 같으면 굳이 다시 쓰지 않는다 (깜빡임·불필요 이벤트 방지)
+  if (serializeGoalData(merged) === serializeGoalData(local)) return
+  applyLocalGoalDataBundle(merged)
+}
+
+/**
+ * 원격을 한 번 당겨 반영한다. 앱이 (백그라운드에서) 돌아왔을 때 놓친 변경을 따라잡는 용도.
+ * 실시간 구독이 끊겼던 구간을 메운다. 실패해도 조용히 넘어간다.
+ */
+export async function pullRemoteGoalDataOnce(): Promise<void> {
+  if (!isCloudSyncAvailable()) return
+  const userId = getActiveSyncUser()
+  if (!userId) return
+  try {
+    const row = await fetchRemoteGoalData(userId)
+    if (row) applyRemoteGoalRow(row)
+  } catch {
+    // 조회 실패는 무시 — 다음 기회에 다시 당긴다
+  }
 }
 
 export function scheduleGoalDataSync(): void {

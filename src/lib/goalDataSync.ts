@@ -1,4 +1,4 @@
-import type { GoalPlan } from '../types/goalPlan'
+import type { GoalPlan, PlanCheckItem } from '../types/goalPlan'
 import { getGoalAppOwnerId } from './goalAppOwner'
 import {
   fetchRemoteGoalData,
@@ -97,16 +97,74 @@ export function applyLocalGoalDataBundle(bundle: GoalDataBundle): void {
   window.dispatchEvent(new CustomEvent(GOAL_DATA_SYNC_EVENT))
 }
 
+/** 목표 트리(월·주·일)의 모든 체크 항목을 평평하게 모은다 */
+function collectPlanItems(plan: GoalPlan): PlanCheckItem[] {
+  const h = plan.hierarchy
+  if (!h) return []
+  const out: PlanCheckItem[] = []
+  for (const m of h.months ?? []) out.push(...(m.items ?? []))
+  for (const w of h.weeks ?? []) {
+    out.push(...(w.items ?? []))
+    for (const d of w.days ?? []) out.push(...(d.items ?? []))
+  }
+  for (const d of h.days ?? []) out.push(...(d.items ?? []))
+  return out
+}
+
+/** 같은 id의 두 항목 중 최신(updatedAt 큰 쪽). 없으면 base(a)를 유지 */
+function pickNewerPlanItem(a: PlanCheckItem, b: PlanCheckItem): PlanCheckItem {
+  const at = a.updatedAt
+  const bt = b.updatedAt
+  if (at != null && bt != null) return at >= bt ? a : b
+  if (bt != null) return b // base(a)엔 시각이 없고 상대만 고쳐졌다 → 상대
+  return a
+}
+
+/**
+ * 같은 목표의 두 버전을 **항목 단위로** 병합한다.
+ * 뼈대(구조)는 목표 단위로 더 최신인 쪽을 쓰되, 그 안의 각 항목은 양쪽 중 더 늦게 고친 것을 얹는다.
+ * → 맥에서 "단어 체크", 폰에서 "듣기 체크"를 각각 해도 둘 다 반영된다(통째 병합에 안 묻힘).
+ */
+function mergePlanPair(local: GoalPlan, remote: GoalPlan): GoalPlan {
+  const baseIsLocal = (local.updatedAt ?? '').localeCompare(remote.updatedAt ?? '') >= 0
+  const base = baseIsLocal ? local : remote
+  const other = baseIsLocal ? remote : local
+
+  const byId = new Map<string, PlanCheckItem>()
+  for (const it of collectPlanItems(base)) byId.set(it.id, it)
+  for (const it of collectPlanItems(other)) {
+    const b = byId.get(it.id)
+    if (b) byId.set(it.id, pickNewerPlanItem(b, it)) // 뼈대에 있는 항목만 얹는다
+  }
+
+  const overlay = (items?: PlanCheckItem[]): PlanCheckItem[] =>
+    (items ?? []).map((it) => byId.get(it.id) ?? it)
+  const h = base.hierarchy
+  if (!h) return base
+  return {
+    ...base,
+    hierarchy: {
+      ...h,
+      months: (h.months ?? []).map((m) => ({ ...m, items: overlay(m.items) })),
+      weeks: (h.weeks ?? []).map((w) => ({
+        ...w,
+        items: overlay(w.items),
+        days: (w.days ?? []).map((d) => ({ ...d, items: overlay(d.items) })),
+      })),
+      days: (h.days ?? []).map((d) => ({ ...d, items: overlay(d.items) })),
+    },
+  }
+}
+
 function mergePlans(local: GoalPlan[], remote: GoalPlan[]): GoalPlan[] {
   const byId = new Map<string, GoalPlan>()
   for (const plan of remote) byId.set(plan.id, plan)
   for (const plan of local) {
     const existing = byId.get(plan.id)
-    if (!existing || plan.updatedAt.localeCompare(existing.updatedAt) >= 0) {
-      byId.set(plan.id, plan)
-    }
+    // 양쪽에 같은 목표가 있으면 항목 단위로 병합, 한쪽에만 있으면 그대로
+    byId.set(plan.id, existing ? mergePlanPair(plan, existing) : plan)
   }
-  return [...byId.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  return [...byId.values()].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
 }
 
 /**

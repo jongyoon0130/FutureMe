@@ -57,3 +57,21 @@ describe('mergeGoalDataBundles — 항목별 최신 우선(updatedAt)', () => {
     expect(mergeGoalDataBundles(local, remote).miscTodos.find((t) => t.id === 'X')?.label).toBe('원격')
   })
 })
+
+// 삭제 전파 — 툼스톤(deletedAt)이 병합에서 어떻게 이기고 지는가
+describe('mergeGoalDataBundles — 삭제 전파(툼스톤)', () => {
+  it('지운 항목은 원격에 아직 살아 있어도 되살아나지 않는다', () => {
+    const local = bundle(0, [misc('X', { deletedAt: 5000 })]) // 이 기기서 지움
+    const remote = bundle(999, [misc('X', { updatedAt: 1000 })]) // 다른 기기엔 아직 살아 있음(옛 편집)
+    const x = mergeGoalDataBundles(local, remote).miscTodos.find((t) => t.id === 'X')
+    expect(x?.deletedAt).toBe(5000) // 여전히 삭제 상태 → 화면에서 걸러짐
+  })
+
+  it('삭제한 뒤 다른 기기에서 더 늦게 고치면 되살아난다', () => {
+    const local = bundle(0, [misc('X', { deletedAt: 1000 })])
+    const remote = bundle(0, [misc('X', { label: 'X부활', updatedAt: 5000 })])
+    const x = mergeGoalDataBundles(local, remote).miscTodos.find((t) => t.id === 'X')
+    expect(x?.deletedAt).toBeUndefined()
+    expect(x?.label).toBe('X부활')
+  })
+})

@@ -25,6 +25,28 @@ export interface MiscTodoItem {
    * 없으면(옛 데이터) 번들 단위 규칙으로 물러난다. 항목을 만들거나 고칠 때마다 갱신한다.
    */
   updatedAt?: number
+  /**
+   * 삭제 표식(툼스톤). 지운 시각(ms). 설정돼 있으면 이 항목은 **지워진 것**이라 화면에
+   * 안 뜨지만, 배열에는 남아서 동기화로 다른 기기까지 삭제를 전파한다. 지운 뒤 다른 기기에서
+   * 그 항목을 더 늦게 고쳤으면(updatedAt > deletedAt) 병합 때 되살아난다. 오래되면 정리한다.
+   */
+  deletedAt?: number
+}
+
+/** 툼스톤을 이 기간(ms)보다 오래 두지 않는다 — 그쯤이면 모든 기기가 삭제를 받아갔다고 본다 */
+const TOMBSTONE_TTL_MS = 60 * 24 * 60 * 60 * 1000 // 60일
+
+/** 항목을 삭제 표식(툼스톤)으로 바꾼다. 화면 표시는 label로 걸러지므로 label도 비운다 */
+function toTombstone(it: MiscTodoItem): MiscTodoItem {
+  const now = Date.now()
+  return { id: it.id, label: '', done: it.done, tier: it.tier, periodKey: it.periodKey, deletedAt: now, updatedAt: now }
+}
+
+/** 오래된 툼스톤을 버린다 (저장 때마다 불러 배열이 무한정 자라지 않게) */
+function pruneTombstones(items: MiscTodoItem[]): MiscTodoItem[] {
+  const cutoff = Date.now() - TOMBSTONE_TTL_MS
+  const pruned = items.filter((it) => !(it.deletedAt && it.deletedAt < cutoff))
+  return pruned.length === items.length ? items : pruned
 }
 
 function storageKey(profileId: string): string {
@@ -60,7 +82,7 @@ export function loadMiscTodos(profileId: string): MiscTodoItem[] {
 }
 
 export function saveMiscTodos(profileId: string, items: MiscTodoItem[]): void {
-  localStorage.setItem(storageKey(profileId), JSON.stringify(items))
+  localStorage.setItem(storageKey(profileId), JSON.stringify(pruneTombstones(items)))
   if (!isApplyingRemoteGoalData()) {
     void import('./goalDataSync').then(({ scheduleGoalDataSync }) => scheduleGoalDataSync())
   }
@@ -112,7 +134,9 @@ export function toggleMiscTodo(profileId: string, items: MiscTodoItem[], itemId:
 }
 
 export function removeMiscTodo(profileId: string, items: MiscTodoItem[], itemId: string): MiscTodoItem[] {
-  const next = items.filter((it) => it.id !== itemId)
+  // 배열에서 빼지 않고 툼스톤으로 바꾼다 — 이걸 안 하면 "지웠다"는 사실이 동기화로 안 가서
+  // 다른 기기에 아직 있는 항목이 되살아난다.
+  const next = items.map((it) => (it.id === itemId && !it.deletedAt ? toTombstone(it) : it))
   saveMiscTodos(profileId, next)
   return next
 }
@@ -124,7 +148,7 @@ export function removeMiscTodos(
 ): MiscTodoItem[] {
   const drop = new Set(itemIds)
   if (!drop.size) return items
-  const next = items.filter((it) => !drop.has(it.id))
+  const next = items.map((it) => (drop.has(it.id) && !it.deletedAt ? toTombstone(it) : it))
   saveMiscTodos(profileId, next)
   return next
 }

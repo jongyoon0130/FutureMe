@@ -83,7 +83,8 @@ describe('moveHomeAggregatedItem', () => {
       targetPlanId: 'plan-a',
     })
 
-    expect(moved?.miscTodos).toHaveLength(0)
+    // 옮긴 뒤 일상엔 살아 있는 항목이 없다 (원래 항목은 툼스톤으로 남아 다른 기기에도 삭제 전파)
+    expect(moved?.miscTodos.filter((t) => !t.deletedAt)).toHaveLength(0)
     const daily = aggregateForDate(moved!.plans, DATE).daily
     expect(daily.some((it) => it.planId === 'plan-a' && it.label === '풋살' && it.done)).toBe(true)
   })

@@ -154,23 +154,45 @@ export function remoteRowToBundle(row: RemoteGoalDataRow): GoalDataBundle {
   }
 }
 
+/**
+ * 올리기 전 병합 — **이 기기의 편집은 무조건 지키고, 다른 기기가 새로 추가한 것만 흡수한다.**
+ *
+ * 왜 타임스탬프 최신 우선(mergeGoalDataBundles)을 안 쓰나:
+ *   그건 번들 단위 updatedAt으로 승자를 정하는데, 폰↔맥 시계가 조금만 어긋나도
+ *   방금 이 기기에서 넣은 편집(예: 할 일 시간)이 "원격이 더 최신"으로 판정돼 덮어써진다.
+ *   실제로 폰에서 시간을 넣으면 바로 사라지는 버그가 이거였다.
+ *
+ * 그래서 푸시 경로에서는 **같은 id는 항상 로컬(이 기기)** 을 쓰고, **로컬에 없는 원격 id만**
+ * 덧붙인다. 이러면:
+ *   - 이 기기의 방금 편집은 절대 안 잃는다 (같은 id는 로컬 승).
+ *   - 다른 기기가 새로 추가한 할 일은 안 지운다 (원격-only는 흡수) → 예약도 안 사라진다.
+ * 같은 id의 "다른 기기 최신 편집"은 그 기기가 자기 화면 기준으로 다시 올리며 수렴한다.
+ */
+export function absorbRemoteOnly<T extends { id: string }>(local: T[], remote: T[]): T[] {
+  const localIds = new Set(local.map((x) => x.id))
+  const extra = remote.filter((x) => !localIds.has(x.id))
+  return extra.length ? [...local, ...extra] : local // 덧붙일 게 없으면 원본 그대로(참조 유지)
+}
+
 export async function pushLocalGoalData(): Promise<void> {
   if (!isCloudSyncAvailable()) return
   const local = loadLocalGoalDataBundle()
 
-  // **올리기 전에 원격과 병합한다.** 안 그러면 이 경로가 원격을 통째로 덮어써서,
-  // 다른 기기가 먼저 올린 할 일이 사라지고 그 할 일에 걸린 알림 예약도 같이 지워진다
-  // (폰+맥을 같이 쓰면 알림이 조용히 안 오게 되는 원인). 병합은 id 기준 + 최신 우선이라
-  // 이 기기의 방금 편집은 지키면서 다른 기기 것만 흡수한다.
   let bundle = local
   const userId = getActiveSyncUser()
   if (userId) {
     try {
       const remoteRow = await fetchRemoteGoalData(userId)
       if (remoteRow) {
-        const merged = mergeGoalDataBundles(local, remoteRowToBundle(remoteRow))
-        applyLocalGoalDataBundle(merged) // 다른 기기 변경을 이 기기 화면에도 반영
-        bundle = merged
+        const remote = remoteRowToBundle(remoteRow)
+        const plans = absorbRemoteOnly(local.plans, remote.plans)
+        const miscTodos = absorbRemoteOnly(local.miscTodos, remote.miscTodos)
+        const routines = absorbRemoteOnly(local.routines, remote.routines)
+        // 흡수한 게 있을 때만 로컬에 반영(불필요한 리렌더·깜빡임 방지)
+        if (plans !== local.plans || miscTodos !== local.miscTodos || routines !== local.routines) {
+          bundle = { ...local, plans, miscTodos, routines }
+          applyLocalGoalDataBundle(bundle)
+        }
       }
     } catch {
       // 원격 조회 실패는 무시하고 로컬로 올린다 — 저장이 막히는 것보단 낫다

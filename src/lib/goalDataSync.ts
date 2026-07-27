@@ -110,13 +110,20 @@ function mergePlans(local: GoalPlan[], remote: GoalPlan[]): GoalPlan[] {
 }
 
 /**
- * 같은 id의 두 항목 중 최신을 고른다. **항목별 updatedAt이 있으면 그걸로**(체크·시간 편집이
- * 방향과 무관하게 정확히 반영된다). 한쪽에만 updatedAt이 있으면 그쪽이 "고쳐진 것"이므로 이긴다.
- * 둘 다 없으면(옛 데이터) 번들 단위 규칙(preferLocal)으로 물러난다.
+ * 같은 id의 두 항목 중 최신을 고른다.
+ *
+ * "시각"은 삭제(툼스톤)면 deletedAt, 아니면 updatedAt으로 본다. 더 나중이 이긴다:
+ *   - 삭제가 더 나중  → 툼스톤이 이김(계속 지워진 채, 다른 기기에도 삭제 전파).
+ *   - 편집이 더 나중  → 살아 있는 항목이 이김(삭제 뒤 다시 고쳤으면 되살아난다).
+ * 둘 다 시각이 없으면(옛 데이터) 번들 단위 규칙(preferLocal)으로 물러난다.
  */
+function itemTime(it: MiscTodoItem): number | undefined {
+  return it.deletedAt ?? it.updatedAt
+}
+
 function pickNewerTodo(local: MiscTodoItem, remote: MiscTodoItem, preferLocal: boolean): MiscTodoItem {
-  const lt = local.updatedAt
-  const rt = remote.updatedAt
+  const lt = itemTime(local)
+  const rt = itemTime(remote)
   if (lt != null && rt != null) return lt >= rt ? local : remote
   if (lt != null) return local
   if (rt != null) return remote

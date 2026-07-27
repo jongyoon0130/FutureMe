@@ -219,10 +219,12 @@ function miscAggregatedLite(items: MiscTodoItem[], date: Date): {
       notifyOff: it.notifyOff,
     }))
 
+  // 지워진 항목(툼스톤)은 제외 — 안 그러면 지운 할 일에 알림 예약이 다시 잡힌다
+  const live = items.filter((it) => !it.deletedAt)
   return {
-    daily: toAgg(items.filter((it) => it.tier === 'daily' && it.periodKey === dailyKey), 'daily'),
-    weekly: toAgg(items.filter((it) => it.tier === 'weekly' && it.periodKey === weeklyKey), 'weekly'),
-    monthly: toAgg(items.filter((it) => it.tier === 'monthly' && it.periodKey === monthlyKey), 'monthly'),
+    daily: toAgg(live.filter((it) => it.tier === 'daily' && it.periodKey === dailyKey), 'daily'),
+    weekly: toAgg(live.filter((it) => it.tier === 'weekly' && it.periodKey === weeklyKey), 'weekly'),
+    monthly: toAgg(live.filter((it) => it.tier === 'monthly' && it.periodKey === monthlyKey), 'monthly'),
   }
 }
 

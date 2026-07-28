@@ -84,3 +84,44 @@ export function hydratePlansFromSections(plans: GoalPlan[]): { plans: GoalPlan[]
   })
   return { plans: next, changed }
 }
+
+/** 과거 하이드레이션 버그가 여러 날에 박아둔 중복 항목 id를 1회 정리 */
+export const HIERARCHY_IDS_DEDUP_VERSION = 1
+
+function dedupeItems(items: PlanCheckItem[], seen: Set<string>): PlanCheckItem[] {
+  return items.map((it) => {
+    if (!seen.has(it.id)) {
+      seen.add(it.id)
+      return it
+    }
+    return { ...it, id: crypto.randomUUID() }
+  })
+}
+
+export function dedupeHierarchyItemIds(plan: GoalPlan): GoalPlan {
+  if (plan.hierarchyIdsDedupedV1 === HIERARCHY_IDS_DEDUP_VERSION) return plan
+  const h = plan.hierarchy
+  if (!h) return { ...plan, hierarchyIdsDedupedV1: HIERARCHY_IDS_DEDUP_VERSION }
+
+  const seen = new Set<string>()
+  const next = structuredClone(h) as typeof h
+
+  for (const month of next.months) month.items = dedupeItems(month.items, seen)
+  for (const week of next.weeks) {
+    week.items = dedupeItems(week.items, seen)
+    for (const day of week.days) day.items = dedupeItems(day.items, seen)
+  }
+  for (const day of next.days) day.items = dedupeItems(day.items, seen)
+
+  return { ...plan, hierarchy: next, hierarchyIdsDedupedV1: HIERARCHY_IDS_DEDUP_VERSION }
+}
+
+export function dedupePlansHierarchyItemIds(plans: GoalPlan[]): { plans: GoalPlan[]; changed: boolean } {
+  let changed = false
+  const next = plans.map((p) => {
+    const deduped = dedupeHierarchyItemIds(p)
+    if (deduped !== p) changed = true
+    return deduped
+  })
+  return { plans: next, changed }
+}

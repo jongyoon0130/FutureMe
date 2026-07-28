@@ -194,6 +194,8 @@ export interface GoalPlan {
   hierarchy?: GoalHierarchy
   /** 동기·미래상·미달 — 미래의 나 대화용 */
   motivation?: GoalMotivationAnswers
+  /** 과거 하이드레이션 버그로 생긴 중복 항목 id 1회 정리 완료 버전 */
+  hierarchyIdsDedupedV1?: number
   createdAt: string
   updatedAt: string
 }

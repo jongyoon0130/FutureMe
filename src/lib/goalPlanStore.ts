@@ -2,7 +2,7 @@ import type { GoalPlan } from '../types/goalPlan'
 import { GOAL_PLAN_TEMPLATE_VERSION } from '../types/goalPlan'
 import type { SelfProfile } from '../types/self'
 import { mergeMotivationAnswers, recoverPlansMotivation } from './goalMotivationRecovery'
-import { hydratePlansFromSections } from './goalSectionHydration'
+import { dedupePlansHierarchyItemIds, hydratePlansFromSections } from './goalSectionHydration'
 import { restoreGoalPlansFromSnapshot, writeGoalPlanSnapshot } from './goalPlanSnapshot'
 import { migrateGoalPlan } from './goalTemplateEngine'
 import { isApplyingRemoteGoalData } from './goalDataSyncState'
@@ -122,11 +122,15 @@ function mergeExternalPlans(profileId: string, profile?: SelfProfile): GoalPlan[
   const hydrated = hydratePlansFromSections(merged)
   merged = hydrated.plans
 
+  const deduped = dedupePlansHierarchyItemIds(merged)
+  merged = deduped.plans
+
   if (
     merged.length !== current.length ||
     external.length > 0 ||
     recovered.changed ||
     hydrated.changed ||
+    deduped.changed ||
     needsPersistMigration(current, merged)
   ) {
     saveAll(profileId, merged)

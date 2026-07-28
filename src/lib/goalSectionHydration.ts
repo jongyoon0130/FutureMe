@@ -50,7 +50,10 @@ export function hydrateHierarchyFromSections(plan: GoalPlan): GoalPlan {
       if (daySource?.length && hasEmptyTierItems(todayDay.items)) {
         todayDay.items = todayDay.items.length
           ? copyItemLabels(daySource, todayDay.items)
-          : daySource.map((s) => ({ id: s.id, label: s.label, done: s.done }))
+          : // **날마다 새 id를 부여한다.** 섹션 항목 id를 그대로 쓰면, 이 하이드레이션이
+            // "오늘"에 해당하는 날마다 돌면서 같은 id를 여러 날에 박아버린다 → 홈 체크가
+            // 그 id의 첫 항목(앞 주)을 토글하는 버그가 생긴다. 각 날은 자기만의 항목을 갖는다.
+            daySource.map((s) => ({ id: crypto.randomUUID(), label: s.label, done: s.done }))
         changed = true
       }
     }

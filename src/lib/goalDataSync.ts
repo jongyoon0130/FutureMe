@@ -1,4 +1,4 @@
-import type { GoalPlan } from '../types/goalPlan'
+import type { GoalPlan, PlanCheckItem } from '../types/goalPlan'
 import { getGoalAppOwnerId } from './goalAppOwner'
 import {
   fetchRemoteGoalData,
@@ -97,14 +97,84 @@ export function applyLocalGoalDataBundle(bundle: GoalDataBundle): void {
   window.dispatchEvent(new CustomEvent(GOAL_DATA_SYNC_EVENT))
 }
 
+/** 목표 트리(월·주·일)의 모든 체크 항목 id를 모은다 */
+function collectPlanItemIds(plan: GoalPlan): Set<string> {
+  const ids = new Set<string>()
+  const h = plan.hierarchy
+  if (!h) return ids
+  for (const m of h.months ?? []) for (const it of m.items) ids.add(it.id)
+  for (const w of h.weeks ?? []) {
+    for (const it of w.items) ids.add(it.id)
+    for (const d of w.days ?? []) for (const it of d.items) ids.add(it.id)
+  }
+  for (const d of h.days ?? []) for (const it of d.items) ids.add(it.id)
+  return ids
+}
+
+/**
+ * 같은 목표의 두 버전을 합친다. **뼈대(구조·순서·focus)는 목표 updatedAt이 최신인 쪽**을
+ * 쓰되, 상대 버전에만 있는 항목은 같은 노드(월·주·일 id)에 **덧붙여 살린다(union)**.
+ *
+ * 왜 union인가: 한 기기가 옛 복사본을 든 채 목표를 touch(상세뷰 마이그레이션·편집)하거나
+ * 두 기기 시계가 어긋나면, "내용은 옛것인데 updatedAt만 최신"인 버전이 생긴다. 통째 교체
+ * (기존 방식)나 뼈대에 있는 항목만 얹기(#20)로는 상대 기기가 방금 추가한 항목이 통째로
+ * 사라진다(보고된 버그). 항목을 합집합으로 살리면 어느 기기의 새 항목도 잃지 않는다.
+ *
+ * 한계(별도 과제): 항목별 시각·툼스톤이 없어, 같은 항목의 동시 편집은 최신 뼈대 쪽을 쓰고,
+ * 한 기기의 항목 **삭제는 전파되지 않는다**(union이라 상대에 남아 있으면 되살아남).
+ */
+function unionPlanItems(local: GoalPlan, remote: GoalPlan): GoalPlan {
+  const baseIsLocal = local.updatedAt.localeCompare(remote.updatedAt) >= 0
+  const base = baseIsLocal ? local : remote
+  const other = baseIsLocal ? remote : local
+  const bh = base.hierarchy
+  const oh = other.hierarchy
+  if (!bh || !oh) return base
+
+  const baseIds = collectPlanItemIds(base)
+
+  // other의 각 노드(id)에서 base에 없는 항목만 골라 둔다
+  const extraByNode = new Map<string, PlanCheckItem[]>()
+  const collectExtras = (nodeId: string, items: PlanCheckItem[]) => {
+    const extras = items.filter((it) => !baseIds.has(it.id))
+    if (extras.length) extraByNode.set(nodeId, [...(extraByNode.get(nodeId) ?? []), ...extras])
+  }
+  for (const m of oh.months ?? []) collectExtras(m.id, m.items)
+  for (const w of oh.weeks ?? []) {
+    collectExtras(w.id, w.items)
+    for (const d of w.days ?? []) collectExtras(d.id, d.items)
+  }
+  for (const d of oh.days ?? []) collectExtras(d.id, d.items)
+
+  if (extraByNode.size === 0) return base // 합칠 게 없으면 뼈대 그대로
+
+  const withExtras = (nodeId: string, items: PlanCheckItem[]): PlanCheckItem[] => {
+    const extras = extraByNode.get(nodeId)
+    return extras ? [...items, ...extras] : items
+  }
+  return {
+    ...base,
+    hierarchy: {
+      ...bh,
+      months: (bh.months ?? []).map((m) => ({ ...m, items: withExtras(m.id, m.items) })),
+      weeks: (bh.weeks ?? []).map((w) => ({
+        ...w,
+        items: withExtras(w.id, w.items),
+        days: (w.days ?? []).map((d) => ({ ...d, items: withExtras(d.id, d.items) })),
+      })),
+      days: (bh.days ?? []).map((d) => ({ ...d, items: withExtras(d.id, d.items) })),
+    },
+  }
+}
+
 function mergePlans(local: GoalPlan[], remote: GoalPlan[]): GoalPlan[] {
   const byId = new Map<string, GoalPlan>()
   for (const plan of remote) byId.set(plan.id, plan)
   for (const plan of local) {
     const existing = byId.get(plan.id)
-    if (!existing || plan.updatedAt.localeCompare(existing.updatedAt) >= 0) {
-      byId.set(plan.id, plan)
-    }
+    // 양쪽에 같은 목표가 있으면 항목을 합집합으로 병합(어느 쪽 새 항목도 안 잃게),
+    // 한쪽에만 있으면 그대로 둔다.
+    byId.set(plan.id, existing ? unionPlanItems(plan, existing) : plan)
   }
   return [...byId.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }

@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'bun:test'
 import { mergeGoalDataBundles, type GoalDataBundle } from '../src/lib/goalDataSync'
 import type { MiscTodoItem } from '../src/lib/goalMiscTodos'
+import type { GoalPlan } from '../src/types/goalPlan'
 
 function misc(id: string, over: Partial<MiscTodoItem> = {}): MiscTodoItem {
   return { id, label: id, done: false, tier: 'daily', periodKey: '2026-07-27', ...over }
@@ -12,6 +13,32 @@ function misc(id: string, over: Partial<MiscTodoItem> = {}): MiscTodoItem {
 
 function bundle(updatedAt: number, miscTodos: MiscTodoItem[]): GoalDataBundle {
   return { ownerId: 'o', plans: [], miscTodos, routines: [], updatedAt }
+}
+
+// 하루 항목(itemLabels)만 있는 최소 목표 — mergePlans는 id·updatedAt·hierarchy만 본다
+function planWithDayItems(updatedAt: string, labels: string[]): GoalPlan {
+  return {
+    id: 'P1',
+    profileId: 'o',
+    updatedAt,
+    templateVersion: 3,
+    sections: [],
+    hierarchy: {
+      horizon: 'day-only',
+      months: [],
+      weeks: [],
+      days: [{ id: 'D1', focus: '', items: labels.map((l) => ({ id: `it-${l}`, label: l, done: false })) }],
+    },
+  } as unknown as GoalPlan
+}
+
+function planBundle(updatedAt: number, plans: GoalPlan[]): GoalDataBundle {
+  return { ownerId: 'o', plans, miscTodos: [], routines: [], updatedAt }
+}
+
+function dayItemLabels(b: GoalDataBundle): string[] {
+  const p = b.plans.find((x) => x.id === 'P1')
+  return (p?.hierarchy?.days[0]?.items.map((i) => i.label) ?? []).sort()
 }
 
 // 항목 updatedAt이 없는 옛 데이터 — 번들 단위 규칙(preferLocal)으로 물러난다
@@ -55,6 +82,34 @@ describe('mergeGoalDataBundles — 항목별 최신 우선(updatedAt)', () => {
     const local = bundle(0, [misc('X', { label: '로컬', updatedAt: 100 })])
     const remote = bundle(0, [misc('X', { label: '원격', updatedAt: 200 })])
     expect(mergeGoalDataBundles(local, remote).miscTodos.find((t) => t.id === 'X')?.label).toBe('원격')
+  })
+})
+
+// 목표(플랜) 트리 항목 병합 — 어느 기기의 새 항목도 잃지 않아야 한다(회귀 방지)
+describe('mergeGoalDataBundles — 목표 트리 항목 union', () => {
+  it('맥이 옛 목표를 touch해 updatedAt만 최신이어도, 폰이 추가한 항목은 안 사라진다', () => {
+    // 맥: 내용은 옛것(A만)인데 touch로 updatedAt이 더 큼. 폰: A·X (진짜 최신 편집).
+    const mac = planBundle(0, [planWithDayItems('2026-07-30T09:00:00.000Z', ['A'])])
+    const phone = planBundle(0, [planWithDayItems('2026-07-30T08:00:00.000Z', ['A', 'X'])])
+    expect(dayItemLabels(mergeGoalDataBundles(mac, phone))).toEqual(['A', 'X'])
+  })
+
+  it('반대 방향도 대칭 — 폰 뼈대가 최신이어도 맥의 새 항목을 살린다', () => {
+    const mac = planBundle(0, [planWithDayItems('2026-07-30T08:00:00.000Z', ['A', 'Y'])])
+    const phone = planBundle(0, [planWithDayItems('2026-07-30T09:00:00.000Z', ['A'])])
+    expect(dayItemLabels(mergeGoalDataBundles(mac, phone))).toEqual(['A', 'Y'])
+  })
+
+  it('양쪽이 서로 다른 항목을 추가하면 둘 다 남는다', () => {
+    const mac = planBundle(0, [planWithDayItems('2026-07-30T09:00:00.000Z', ['A', 'M'])])
+    const phone = planBundle(0, [planWithDayItems('2026-07-30T08:00:00.000Z', ['A', 'P'])])
+    expect(dayItemLabels(mergeGoalDataBundles(mac, phone))).toEqual(['A', 'M', 'P'])
+  })
+
+  it('한쪽에만 있는 목표는 그대로 보존된다', () => {
+    const mac = planBundle(0, [planWithDayItems('2026-07-30T09:00:00.000Z', ['A'])])
+    const phone = planBundle(0, [])
+    expect(mergeGoalDataBundles(mac, phone).plans.map((p) => p.id)).toEqual(['P1'])
   })
 })
 

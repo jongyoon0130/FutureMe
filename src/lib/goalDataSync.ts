@@ -7,7 +7,7 @@ import {
   pushGoalDataToCloud,
   type RemoteGoalDataRow,
 } from './cloudSync'
-import { loadGoalPlans } from './goalPlanStore'
+import { loadGoalPlansForSync } from './goalPlanStore'
 import { writeGoalPlanSnapshot } from './goalPlanSnapshot'
 import { loadMiscTodos, type MiscTodoItem } from './goalMiscTodos'
 import { loadRoutines, type MiscRoutine } from './goalRoutines'
@@ -58,7 +58,7 @@ export function loadLocalGoalDataBundle(): GoalDataBundle {
   const ownerId = getGoalAppOwnerId()
   return {
     ownerId,
-    plans: loadGoalPlans(ownerId),
+    plans: loadGoalPlansForSync(ownerId),
     miscTodos: loadMiscTodos(ownerId),
     routines: loadRoutines(ownerId),
     updatedAt: getGoalDataRevision(),
@@ -97,12 +97,23 @@ export function applyLocalGoalDataBundle(bundle: GoalDataBundle): void {
   window.dispatchEvent(new CustomEvent(GOAL_DATA_SYNC_EVENT))
 }
 
+/**
+ * 목표의 "시각"(ms). 삭제(툼스톤)면 deletedAt, 아니면 updatedAt(ISO→ms). 더 나중이 이긴다:
+ *   - 삭제가 더 나중 → 툼스톤이 이김(계속 지워진 채, 다른 기기에도 삭제 전파)
+ *   - 편집이 더 나중 → 살아 있는 목표가 이김(삭제 뒤 다시 만들었으면 되살아난다)
+ */
+function planTime(p: GoalPlan): number {
+  if (p.deletedAt != null) return p.deletedAt
+  const t = Date.parse(p.updatedAt)
+  return Number.isNaN(t) ? 0 : t
+}
+
 function mergePlans(local: GoalPlan[], remote: GoalPlan[]): GoalPlan[] {
   const byId = new Map<string, GoalPlan>()
   for (const plan of remote) byId.set(plan.id, plan)
   for (const plan of local) {
     const existing = byId.get(plan.id)
-    if (!existing || plan.updatedAt.localeCompare(existing.updatedAt) >= 0) {
+    if (!existing || planTime(plan) >= planTime(existing)) {
       byId.set(plan.id, plan)
     }
   }

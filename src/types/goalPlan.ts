@@ -198,6 +198,12 @@ export interface GoalPlan {
   hierarchyIdsDedupedV1?: number
   createdAt: string
   updatedAt: string
+  /**
+   * 삭제 표식(툼스톤). 지운 시각(ms). 설정돼 있으면 이 목표는 **지워진 것**이라 화면에
+   * 안 뜨지만, 배열에는 남아서 동기화로 다른 기기까지 삭제를 전파한다. 이게 없으면
+   * 지운 목표가 병합 때(원격에 아직 살아 있으면) 되살아난다. 오래되면 정리한다.
+   */
+  deletedAt?: number
 }
 
 export function emptyGoalIntake(): GoalIntake {

@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'bun:test'
 import { mergeGoalDataBundles, type GoalDataBundle } from '../src/lib/goalDataSync'
 import type { MiscTodoItem } from '../src/lib/goalMiscTodos'
+import type { GoalPlan } from '../src/types/goalPlan'
 
 function misc(id: string, over: Partial<MiscTodoItem> = {}): MiscTodoItem {
   return { id, label: id, done: false, tier: 'daily', periodKey: '2026-07-27', ...over }
@@ -12,6 +13,15 @@ function misc(id: string, over: Partial<MiscTodoItem> = {}): MiscTodoItem {
 
 function bundle(updatedAt: number, miscTodos: MiscTodoItem[]): GoalDataBundle {
   return { ownerId: 'o', plans: [], miscTodos, routines: [], updatedAt }
+}
+
+// 병합은 id/updatedAt/deletedAt만 본다 — 나머지 필드는 최소로 채운다
+function plan(id: string, updatedAtIso: string, over: Partial<GoalPlan> = {}): GoalPlan {
+  return { id, updatedAt: updatedAtIso, title: id, ...over } as unknown as GoalPlan
+}
+
+function planBundle(updatedAt: number, plans: GoalPlan[]): GoalDataBundle {
+  return { ownerId: 'o', plans, miscTodos: [], routines: [], updatedAt }
 }
 
 // 항목 updatedAt이 없는 옛 데이터 — 번들 단위 규칙(preferLocal)으로 물러난다
@@ -73,5 +83,30 @@ describe('mergeGoalDataBundles — 삭제 전파(툼스톤)', () => {
     const x = mergeGoalDataBundles(local, remote).miscTodos.find((t) => t.id === 'X')
     expect(x?.deletedAt).toBeUndefined()
     expect(x?.label).toBe('X부활')
+  })
+})
+
+// 목표(습관/프로젝트) 삭제 전파 — 툼스톤이 없던 시절엔 지운 목표가 병합 때 되살아났다 (이 버그의 회귀 방지)
+describe('mergeGoalDataBundles — 목표(GoalPlan) 삭제 전파(툼스톤)', () => {
+  it('지운 목표는 원격에 아직 살아 있어도 되살아나지 않는다', () => {
+    // 원격 번들이 더 최신(999)이라도, deletedAt(5000) > 원격 목표 updatedAt(2026-01-01) 이면 삭제가 이긴다
+    const local = planBundle(0, [plan('G', '2026-01-01T00:00:00.000Z', { deletedAt: 5_000_000_000_000 })])
+    const remote = planBundle(999, [plan('G', '2026-01-01T00:00:00.000Z')])
+    const g = mergeGoalDataBundles(local, remote).plans.find((p) => p.id === 'G')
+    expect(g?.deletedAt).toBe(5_000_000_000_000) // 여전히 삭제 상태 → 화면에서 걸러짐
+  })
+
+  it('삭제한 뒤 다른 기기에서 더 늦게 만들면 되살아난다', () => {
+    const local = planBundle(0, [plan('G', '2026-01-01T00:00:00.000Z', { deletedAt: 1000 })])
+    const remote = planBundle(0, [plan('G', '2026-07-01T00:00:00.000Z', { title: 'G부활' })])
+    const g = mergeGoalDataBundles(local, remote).plans.find((p) => p.id === 'G')
+    expect(g?.deletedAt).toBeUndefined()
+    expect(g?.title).toBe('G부활')
+  })
+
+  it('삭제 안 된 목표는 종전대로 최신 updatedAt이 이긴다', () => {
+    const local = planBundle(0, [plan('G', '2026-07-10T00:00:00.000Z', { title: '로컬-최신' })])
+    const remote = planBundle(0, [plan('G', '2026-07-01T00:00:00.000Z', { title: '원격-옛것' })])
+    expect(mergeGoalDataBundles(local, remote).plans.find((p) => p.id === 'G')?.title).toBe('로컬-최신')
   })
 })

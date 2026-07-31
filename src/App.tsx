@@ -11,7 +11,8 @@ import { AuthScreen } from './components/auth/AuthScreen'
 import { APP_NAME } from './lib/brand'
 import { FutureMeLogo } from './components/brand/FutureMeLogo'
 import { useAuth } from './contexts/AuthContext'
-import { subscribeCloudPushStatus, isCloudPushFailing } from './lib/syncStatus'
+import { subscribeCloudPushStatus, isCloudPushFailing, registerCloudRetry } from './lib/syncStatus'
+import { pushLocalGoalData } from './lib/goalDataSync'
 import {
   ensureMigrated,
   loadProfileSummaries,
@@ -51,6 +52,13 @@ export default function App() {
 
   const refreshList = useCallback(() => {
     setSummaries(loadProfileSummaries())
+  }, [])
+
+  // 클라우드 저장 실패 시 자가복구용 재시도. 홈 목표 데이터가 가장 자주 쓰이는
+  // 경로라 이걸 다시 올린다 — 네트워크가 돌아오면 배너가 스스로 사라진다.
+  // ponytail: 재시도는 목표 데이터만. 채팅·프로필 push는 다음 활동 때 자연히 재전송된다.
+  useEffect(() => {
+    registerCloudRetry(() => pushLocalGoalData())
   }, [])
 
   useEffect(() => {
